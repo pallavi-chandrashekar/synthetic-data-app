@@ -36,6 +36,7 @@ A full-stack web application that uses OpenAI to generate synthetic datasets bas
 ```
 synthetic-data-app/
 ├── backend/
+│   ├── .env                  # contains OPENAI_API_KEY
 │   ├── main.py               # FastAPI backend with /generate-data route
 │   └── requirements.txt
 ├── frontend/
@@ -47,7 +48,6 @@ synthetic-data-app/
 │   │   └── index.html
 │   ├── package.json
 │   └── vite.config.js
-├── .env                      # contains OPENAI_API_KEY
 └── README.md
 ```
 
