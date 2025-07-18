@@ -60,6 +60,7 @@ curl -X POST http://localhost:8000/generate-data \
 
 ---
 
+
 ## 📂 Project Structure
 
 ```
@@ -69,16 +70,19 @@ synthetic-data-app/
 │   ├── main.py               # FastAPI backend with /generate-data route
 │   ├── requirements.txt
 │   └── Dockerfile            # backend container
+│   └── test_main.py          # backend unit tests (pytest)
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── DataTable.jsx
-│   │   └── main.jsx
+│   │   ├── main.jsx
+│   │   └── App.test.jsx      # frontend unit tests (Vitest)
 │   ├── public/
 │   │   └── index.html
 │   ├── package.json
 │   ├── vite.config.js
 │   └── Dockerfile            # frontend container
+│   └── setupTests.js         # test setup for React Testing Library
 ├── docker-compose.yml        # multi-container orchestration
 └── README.md
 ```
@@ -117,6 +121,18 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
+#### Running Backend Tests
+
+To run unit tests for the FastAPI backend:
+
+```bash
+cd backend
+# (Activate your virtual environment if not already active)
+pytest
+```
+
+This will discover and run all tests in files named like `test_*.py`.
+
 Ensure your `.env` file contains:
 
 ```
@@ -130,6 +146,17 @@ cd ../frontend
 npm install
 npm run dev
 ```
+
+#### Running Frontend Unit Tests
+
+To run unit tests for the React frontend (using Vitest and React Testing Library):
+
+```bash
+cd frontend
+npx vitest
+```
+
+This will discover and run all tests in files named like `*.test.jsx`.
 
 Visit: [http://localhost:3000](http://localhost:3000)
 
