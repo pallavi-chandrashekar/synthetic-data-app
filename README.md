@@ -31,6 +31,7 @@ A full-stack web application that uses OpenAI to generate synthetic datasets bas
 
 ---
 
+
 ## 📂 Project Structure
 
 ```
@@ -38,16 +39,19 @@ synthetic-data-app/
 ├── backend/
 │   ├── .env                  # contains OPENAI_API_KEY
 │   ├── main.py               # FastAPI backend with /generate-data route
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── test_main.py          # backend unit tests (pytest)
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── DataTable.jsx
-│   │   └── main.jsx
+│   │   ├── main.jsx
+│   │   └── App.test.jsx      # frontend unit tests (Vitest)
 │   ├── public/
 │   │   └── index.html
 │   ├── package.json
-│   └── vite.config.js
+│   ├── vite.config.js
+│   └── setupTests.js         # test setup for React Testing Library
 └── README.md
 ```
 
