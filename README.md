@@ -98,6 +98,17 @@ npm install
 npm run dev
 ```
 
+#### Running Frontend Unit Tests
+
+To run unit tests for the React frontend (using Vitest and React Testing Library):
+
+```bash
+cd frontend
+npx vitest
+```
+
+This will discover and run all tests in files named like `*.test.jsx`.
+
 Visit: [http://localhost:3000](http://localhost:3000)
 
 ---
