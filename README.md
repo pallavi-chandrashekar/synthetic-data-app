@@ -101,8 +101,10 @@ Generate a dataset of employee records with id, name, role, and joining_date
 ---
 
 ## 📸 Screenshots
+<img width="1233" height="462" alt="Screenshot 2025-07-17 at 4 52 40 PM" src="https://github.com/user-attachments/assets/3b89e5f6-1e82-423b-82ae-a7101ff652bc" />
 
-> 📌 UI includes a prompt box, format dropdown, history list, loading state, download, and table preview.
+<img width="1181" height="839" alt="Screenshot 2025-07-17 at 4 53 30 PM" src="https://github.com/user-attachments/assets/4f0fce26-717a-4190-84e0-a4a928eef14e" />
+
 
 ---
 
