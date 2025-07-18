@@ -72,6 +72,18 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
+#### Running Backend Tests
+
+To run unit tests for the FastAPI backend:
+
+```bash
+cd backend
+# (Activate your virtual environment if not already active)
+pytest
+```
+
+This will discover and run all tests in files named like `test_*.py`.
+
 Ensure your `.env` file contains:
 
 ```
