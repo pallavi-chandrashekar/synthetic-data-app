@@ -67,7 +67,8 @@ synthetic-data-app/
 ├── backend/
 │   ├── .env                  # contains OPENAI_API_KEY
 │   ├── main.py               # FastAPI backend with /generate-data route
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── Dockerfile            # backend container
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx
@@ -76,7 +77,9 @@ synthetic-data-app/
 │   ├── public/
 │   │   └── index.html
 │   ├── package.json
-│   └── vite.config.js
+│   ├── vite.config.js
+│   └── Dockerfile            # frontend container
+├── docker-compose.yml        # multi-container orchestration
 └── README.md
 ```
 
