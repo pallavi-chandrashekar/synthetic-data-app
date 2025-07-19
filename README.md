@@ -205,6 +205,15 @@ Pull requests will be automatically opened for outdated dependencies.
 
 ---
 
+
+## 🚀 Showcase & Community
+
+- ⭐ Star this repo to support the project!
+- 💬 Share your feedback, ideas, or questions via [issues](https://github.com/pallavi-chandrashekar/synthetic-data-app/issues).
+- 🌐 Share on social media, blogs, or developer communities.
+- 🧑‍💻 Try the app live: <!-- Add your demo link here, e.g. Vercel/Netlify/Render -->
+- 🏷️ Add topics/tags to help others discover this project.
+
 ## 🙌 Contributing
 
 PRs are welcome! Please open an issue for feature requests or bugs.
