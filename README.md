@@ -1,6 +1,40 @@
+
+
 # 🔄 Synthetic Data Generator (React + FastAPI + OpenAI)
 
+![Build Status](https://github.com/your-username/synthetic-data-app/actions/workflows/ci.yml/badge.svg)
+<!-- Coverage badge removed until coverage tracking is implemented -->
+![License](https://img.shields.io/github/license/pallavichandrashekar/synthetic-data-app)
+
 A full-stack web application that uses OpenAI to generate synthetic datasets based on user prompts. Supports export in JSON or CSV, interactive preview, and rich filtering with prompt history.
+
+---
+
+## 📚 Documentation & API
+
+- **API Reference & Architecture:** See [ARCHITECTURE.md](./ARCHITECTURE.md) for backend API docs, usage examples, and system diagrams.
+- **Frontend:**
+  - Main entry: `frontend/src/App.jsx`
+  - Data table: `frontend/src/DataTable.jsx`
+  - API call: POST `/generate-data` (see below)
+
+### Example API Usage
+
+```bash
+curl -X POST http://localhost:8000/generate-data \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Generate 10 users with name and email", "format": "json"}'
+```
+
+**Response:**
+```json
+{
+  "json": [
+    { "name": "Alice", "email": "alice@example.com" },
+    { "name": "Bob", "email": "bob@example.com" }
+  ]
+}
+```
 
 ---
 
@@ -40,6 +74,7 @@ synthetic-data-app/
 │   ├── .env                  # contains OPENAI_API_KEY
 │   ├── main.py               # FastAPI backend with /generate-data route
 │   ├── requirements.txt
+│   └── Dockerfile            # backend container
 │   └── test_main.py          # backend unit tests (pytest)
 ├── frontend/
 │   ├── src/
@@ -51,9 +86,24 @@ synthetic-data-app/
 │   │   └── index.html
 │   ├── package.json
 │   ├── vite.config.js
+│   └── Dockerfile            # frontend container
 │   └── setupTests.js         # test setup for React Testing Library
+├── docker-compose.yml        # multi-container orchestration
 └── README.md
 ```
+
+---
+
+
+## 🐳 Docker Setup (Optional)
+
+You can run the entire stack with Docker and docker-compose:
+
+```bash
+docker-compose up --build
+```
+
+This will start both backend (FastAPI, port 8000) and frontend (Vite, port 3000) containers. Make sure to set your `OPENAI_API_KEY` in `backend/.env`.
 
 ---
 
@@ -138,6 +188,18 @@ Generate a dataset of employee records with id, name, role, and joining_date
 ## 📃 License
 
 MIT License
+
+---
+
+
+## 🔄 Automated Dependency Updates
+
+This repository uses [Dependabot](https://docs.github.com/en/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically/about-dependabot-version-updates) to keep dependencies up to date:
+
+- **Frontend**: Checks npm dependencies in `/frontend` weekly
+- **Backend**: Checks pip dependencies in `/backend` weekly
+
+Pull requests will be automatically opened for outdated dependencies.
 
 ---
 

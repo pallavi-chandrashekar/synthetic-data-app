@@ -20,11 +20,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install bandit
       - name: Create .env file
         run: echo "OPENAI_API_KEY=testkey" > .env
+      - name: Security scan (Bandit)
+        run: bandit -r . --skip B101
       - name: Run backend tests
         run: pytest
-
   frontend-tests:
     runs-on: ubuntu-latest
     defaults:
@@ -38,5 +40,7 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: npm install
+      - name: Security scan (npm audit)
+        run: npm audit --audit-level=moderate || true
       - name: Run frontend tests
         run: npx vitest run
