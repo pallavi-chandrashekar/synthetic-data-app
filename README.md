@@ -2,9 +2,9 @@
 
 # 🔄 Synthetic Data Generator (React + FastAPI + OpenAI)
 
-![Build Status](https://github.com/your-username/synthetic-data-app/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/pallavi-chandrashekar/synthetic-data-app/actions/workflows/ci.yml/badge.svg)
 <!-- Coverage badge removed until coverage tracking is implemented -->
-![License](https://img.shields.io/github/license/pallavichandrashekar/synthetic-data-app)
+![License](https://img.shields.io/github/license/pallavi-chandrashekar/synthetic-data-app)
 
 A full-stack web application that uses OpenAI to generate synthetic datasets based on user prompts. Supports export in JSON or CSV, interactive preview, and rich filtering with prompt history.
 
