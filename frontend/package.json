@@ -16,7 +16,7 @@
     "@mui/x-data-grid": "^5.17.24",
     "axios": "^1.6.8",
     "eslint": "^9.31.0",
-    "react": "^18.2.0",
+    "react": "^19.1.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
