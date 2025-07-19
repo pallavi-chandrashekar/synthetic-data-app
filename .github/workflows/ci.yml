@@ -24,7 +24,7 @@ jobs:
       - name: Create .env file
         run: echo "OPENAI_API_KEY=testkey" > .env
       - name: Security scan (Bandit)
-        run: bandit -r . -c .bandit
+        run: bandit -r . --skip B101
       - name: Run backend tests
         run: pytest
   frontend-tests:
