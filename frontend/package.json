@@ -13,7 +13,7 @@
     "@mui/icons-material": "^5.15.0",
     "@mui/lab": "^5.0.0-alpha.130",
     "@mui/material": "^5.15.0",
-    "@mui/x-data-grid": "^5.17.24",
+    "@mui/x-data-grid": "^8.11.3",
     "axios": "^1.6.8",
     "eslint": "^9.31.0",
     "react": "^18.2.0",
