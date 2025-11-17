@@ -11,6 +11,11 @@ def test_extract_json_valid():
     assert isinstance(result, list)
     assert result[0]["a"] == 1
 
+def test_extract_json_with_rows_key():
+    content = '{"rows": [{"name": "A"}, {"name": "B"}]}'
+    result = extract_json(content)
+    assert len(result) == 2
+    assert result[1]["name"] == "B"
 
 def test_extract_json_with_extra_text():
     content = 'Here is your data: [{"b": 3}, {"b": 4}] End.'
@@ -21,28 +26,10 @@ def test_extract_json_with_extra_text():
 
 @pytest.mark.parametrize("format_type,expected_key", [("json", "json"), ("csv", "csv")])
 def test_generate_data(monkeypatch, format_type, expected_key):
-    class DummyResponse:
-        class Choices:
-            class Message:
-                content = '[{"x": 1}, {"x": 2}]'
-
-            message = Message()
-
-        choices = [Choices()]
-
-    class DummyClient:
-        class Chat:
-            class Completions:
-                @staticmethod
-                async def create(*args, **kwargs):
-                    return DummyResponse()
-
-            completions = Completions()
-
-        chat = Chat()
-
-    # Patch OpenAI client in main
-    monkeypatch.setattr("main.client", DummyClient())
+    monkeypatch.setattr(
+        "main.request_dataset_from_openai",
+        lambda prompt: '{"rows": [{"x": 1}, {"x": 2}]}'
+    )
     payload = {"prompt": "2 rows of x", "format": format_type}
     response = client.post("/generate-data", json=payload)
     assert response.status_code == 200
@@ -50,19 +37,11 @@ def test_generate_data(monkeypatch, format_type, expected_key):
 
 
 def test_generate_data_error(monkeypatch):
-    class DummyClient:
-        class Chat:
-            class Completions:
-                @staticmethod
-                async def create(*args, **kwargs):
-                    raise Exception("API error")
+    def _raise(prompt):
+        raise ValueError("API error")
 
-            completions = Completions()
-
-        chat = Chat()
-
-    monkeypatch.setattr("main.client", DummyClient())
+    monkeypatch.setattr("main.request_dataset_from_openai", _raise)
     payload = {"prompt": "fail", "format": "json"}
     response = client.post("/generate-data", json=payload)
-    assert response.status_code == 200
-    assert "error" in response.json()
+    assert response.status_code == 502
+    assert response.json()["detail"] == "API error"

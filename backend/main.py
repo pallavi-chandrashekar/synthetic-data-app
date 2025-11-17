@@ -1,6 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 import os
@@ -56,7 +56,6 @@ async def generate_data(data_request: DataRequest):
         content = response.choices[0].message.content
         data = extract_json(content)
 
-        # Format response as CSV or JSON
         if data_request.format == "csv":
             df = pd.DataFrame(data)
             return {"csv": df.to_csv(index=False)}
@@ -69,7 +68,7 @@ async def generate_data(data_request: DataRequest):
 
 def extract_json(content):
     try:
-        return json.loads(content)
+        parsed = json.loads(content)
     except json.JSONDecodeError:
         match = re.search(r"\[.*\]", content, re.DOTALL)
         if match:
