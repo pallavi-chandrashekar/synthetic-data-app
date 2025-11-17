@@ -46,6 +46,7 @@ curl -X POST http://localhost:8000/generate-data \
 - 📊 Interactive MUI DataGrid table
   - Column-specific filtering, regex and startsWith modes
   - Sorting and pagination
+- 🧭 UX helpers: sample prompt chips, dataset summary (rows/cols/format), clearable history
 - 💾 One-click download (JSON/CSV)
 - 📜 Prompt history with restore, delete, and undo
 - ⏳ Loading spinner during API call
@@ -153,6 +154,10 @@ npm install
 npm run dev
 ```
 
+**Configuration**
+
+- `VITE_API_URL` (optional): set this to point the frontend at a non-local backend API base.
+
 #### Running Frontend Unit Tests
 
 To run unit tests for the React frontend (using Vitest and React Testing Library):
@@ -174,7 +179,23 @@ Visit: [http://localhost:3000](http://localhost:3000)
 Generate 50 fake customer profiles with fields: name, email, age, country
 Generate 100 sales records with product, quantity, revenue, and date
 Generate a dataset of employee records with id, name, role, and joining_date
+Generate 25 SaaS subscriptions with plan_name, mrr, user_count, and status
 ```
+
+---
+
+## 🎉 Local birthday site & slides (Prisha)
+
+These assets live outside the repo (requested keepsake content) but are noted here for convenience:
+
+- Birthday site: `/Users/pallavichandrashekar/Codex/prisha-birthday/index.php`  
+  - Serve locally: `php -S 127.0.0.1:8080 -t /Users/pallavichandrashekar/Codex/prisha-birthday`
+- Browser slides + narration: `/Users/pallavichandrashekar/Codex/prisha-birthday/web-slides/index.html`  
+  - Serve locally: `php -S 127.0.0.1:8081 -t /Users/pallavichandrashekar/Codex/prisha-birthday/web-slides`
+  - Audio file: `web-slides/assets/prisha-slides-narration.m4a`
+- PPTX export: `/Users/pallavichandrashekar/Codex/prisha-birthday/Prisha_First_Year_Slides.pptx`
+
+Stop either PHP dev server with `kill <pid>` when done.
 
 ---
 
