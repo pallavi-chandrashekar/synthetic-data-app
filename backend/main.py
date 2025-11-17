@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from openai import OpenAI
+from typing import List, Literal
 import os
 import json
 import pandas as pd
@@ -26,46 +27,104 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request payload schema
-class DataRequest(BaseModel):
-    prompt: str
-    format: str = "json"  # or "csv"
 
-# POST endpoint to generate synthetic data
+class DataRequest(BaseModel):
+    prompt: str = Field(
+        ..., min_length=1, description="Prompt describing the dataset to generate"
+    )
+    format: Literal["json", "csv"] = "json"
+
+
+DATASET_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "rows": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "number"},
+                        {"type": "boolean"},
+                        {"type": "null"},
+                    ]
+                },
+            },
+        }
+    },
+    "required": ["rows"],
+    "additionalProperties": False,
+}
+
+
 @app.post("/generate-data")
 async def generate_data(data_request: DataRequest):
     try:
-        # Call OpenAI ChatCompletion API
-        response = client.chat.completions.create(
-            model="gpt-4.1",
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"Generate synthetic data in valid JSON format:\n{data_request.prompt}"
-                }
-            ],
-            temperature=0.7,
-        )
-
-        # Extract the model response content
-        content = response.choices[0].message.content
+        content = request_dataset_from_openai(data_request.prompt)
         data = extract_json(content)
 
-        # Format response as CSV or JSON
         if data_request.format == "csv":
             df = pd.DataFrame(data)
             return {"csv": df.to_csv(index=False)}
 
         return {"json": data}
 
-    except Exception as e:
-        return {"error": str(e)}
-    
-def extract_json(content):
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        match = re.search(r"\[.*\]", content, re.DOTALL)
-        if match:
-            return json.loads(match.group(0))
+    except HTTPException:
         raise
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Failed to generate synthetic data") from exc
+
+
+def request_dataset_from_openai(prompt: str) -> str:
+    response = client.responses.create(
+        model="gpt-4.1",
+        input=(
+            "You are a service that produces synthetic tabular data. "
+            "Always return a JSON object that matches the provided schema and place all rows "
+            "within the `rows` array."
+            f"\n\nUser prompt: {prompt}"
+        ),
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "synthetic_dataset",
+                "schema": DATASET_SCHEMA,
+                "strict": True,
+            },
+        },
+        temperature=0.4,
+    )
+
+    try:
+        first_output = response.output[0]
+        first_content = first_output.content[0]
+        return first_content.text
+    except (AttributeError, IndexError) as exc:
+        raise HTTPException(status_code=502, detail="Malformed response from OpenAI") from exc
+
+
+def extract_json(content: str) -> List[dict]:
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+        if not match:
+            raise ValueError("Response did not contain valid JSON")
+        parsed = json.loads(match.group(0))
+
+    if isinstance(parsed, dict) and "rows" in parsed:
+        rows = parsed["rows"]
+    else:
+        rows = parsed
+
+    if not isinstance(rows, list):
+        raise ValueError("Response JSON must include an array of rows")
+
+    for idx, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"Row {idx} must be an object")
+
+    return rows

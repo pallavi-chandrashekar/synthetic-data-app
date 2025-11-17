@@ -28,7 +28,7 @@ export default function DataTable({ data }) {
     flex: 1,
     sortable: true,
     renderHeader: () => (
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 160 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, minWidth: 200 }}>
         <TextField
           size="small"
           variant="outlined"
@@ -59,6 +59,18 @@ export default function DataTable({ data }) {
             ) : null,
           }}
         />
+        <FormControl size="small">
+          <Select
+            value={filterModes[key] || "contains"}
+            onChange={(e) =>
+              setFilterModes((prev) => ({ ...prev, [key]: e.target.value }))
+            }
+          >
+            <MenuItem value="contains">Contains</MenuItem>
+            <MenuItem value="startsWith">Starts with</MenuItem>
+            <MenuItem value="regex">Regex</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
     ),
   }));
