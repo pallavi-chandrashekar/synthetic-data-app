@@ -110,10 +110,14 @@ def extract_json(content: str) -> List[dict]:
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", content, re.DOTALL)
-        if not match:
-            raise ValueError("Response did not contain valid JSON")
-        parsed = json.loads(match.group(0))
+        array_match = re.search(r"\[.*\]", content, re.DOTALL)
+        if array_match:
+            parsed = json.loads(array_match.group(0))
+        else:
+            object_match = re.search(r"\{.*\}", content, re.DOTALL)
+            if not object_match:
+                raise ValueError("Response did not contain valid JSON")
+            parsed = json.loads(object_match.group(0))
 
     if isinstance(parsed, dict) and "rows" in parsed:
         rows = parsed["rows"]

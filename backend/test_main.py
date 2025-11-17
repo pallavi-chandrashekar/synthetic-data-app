@@ -22,6 +22,13 @@ def test_extract_json_with_extra_text():
     assert isinstance(result, list)
     assert result[1]["b"] == 4
 
+
+def test_extract_json_prefers_array_when_both_present():
+    content = 'Wrapper {"note": "ignored"} and array: [{"c": 1}, {"c": 2}] trailing text'
+    result = extract_json(content)
+    assert isinstance(result, list)
+    assert result[0]["c"] == 1
+
 @pytest.mark.parametrize("format_type,expected_key", [("json", "json"), ("csv", "csv")])
 def test_generate_data(monkeypatch, format_type, expected_key):
     monkeypatch.setattr(
