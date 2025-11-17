@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 import os
@@ -70,7 +70,31 @@ def extract_json(content):
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
-        match = re.search(r"\[.*\]", content, re.DOTALL)
-        if match:
-            return json.loads(match.group(0))
-        raise
+        array_match = re.search(r"\[.*\]", content, re.DOTALL)
+        if array_match:
+            parsed = json.loads(array_match.group(0))
+        else:
+            object_match = re.search(
+                r"\{.*\}", content, re.DOTALL
+            )
+            if not object_match:
+                raise ValueError(
+                    "Response did not contain valid JSON"
+                )
+            parsed = json.loads(object_match.group(0))
+
+    if isinstance(parsed, dict) and "rows" in parsed:
+        rows = parsed["rows"]
+    else:
+        rows = parsed
+
+    if not isinstance(rows, list):
+        raise ValueError(
+            "Response JSON must include an array of rows"
+        )
+
+    for idx, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"Row {idx} must be an object")
+
+    return rows
