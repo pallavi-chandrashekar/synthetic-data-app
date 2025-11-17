@@ -13,7 +13,7 @@
     "@mui/icons-material": "^5.15.0",
     "@mui/lab": "^5.0.0-alpha.130",
     "@mui/material": "^5.15.0",
-    "@mui/x-data-grid": "^5.17.24",
+    "@mui/x-data-grid": "^8.18.0",
     "axios": "^1.6.8",
     "papaparse": "^5.4.1",
     "eslint": "^9.31.0",
