@@ -1,26 +1,27 @@
-# Python
+## Python / backend
 __pycache__/
 *.py[cod]
+*.pyo
+*.so
 *.egg-info/
-venv/
-.venv/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.coverage*
+.env
+backend/.env
 
-# Node
+## Node / frontend
 node_modules/
 dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Environment
-.env
-
-# OS
+## IDE / OS
 .DS_Store
-Thumbs.db
-
-# IDE
 .vscode/
 .idea/
-
-# Coverage
-htmlcov/
-.coverage
-coverage/
