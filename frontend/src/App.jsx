@@ -2,28 +2,42 @@ import { useMemo, useState, useRef } from "react";
 import axios from "axios";
 import Papa from "papaparse";
 import {
+  Alert,
+  AppBar,
   Box,
   Button,
+  Card,
+  CardContent,
+  Chip,
   CircularProgress,
   Container,
-  MenuItem,
-  Select,
-  TextField,
-  Typography,
-  Paper,
-  Snackbar,
-  IconButton,
+  CssBaseline,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Chip,
-  Alert,
+  Divider,
+  IconButton,
+  MenuItem,
+  Snackbar,
+  Select,
+  Stack,
+  Grow,
+  TextField,
+  Toolbar,
+  Typography,
 } from "@mui/material";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
-import MuiAlert from "@mui/material/Alert";
+import HistoryIcon from "@mui/icons-material/History";
+import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import CelebrationIcon from "@mui/icons-material/Celebration";
+import ShuffleIcon from "@mui/icons-material/Shuffle";
+import Brightness4Icon from "@mui/icons-material/Brightness4";
+import Brightness7Icon from "@mui/icons-material/Brightness7";
 import DataTable from "./DataTable";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -69,6 +83,7 @@ function App() {
   const [cache, setCache] = useState({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [promptToDelete, setPromptToDelete] = useState(null);
+  const [colorMode, setColorMode] = useState("light");
   const tableRef = useRef(null);
 
   const datasetSummary = useMemo(() => {
@@ -85,6 +100,30 @@ function App() {
       format: dataset.format,
     };
   }, [dataset]);
+
+  const theme = useMemo(
+    () =>
+      createTheme({
+        palette: {
+          mode: colorMode,
+          primary: {
+            main: colorMode === "light" ? "#ff6b6b" : "#ff8fb1",
+          },
+          secondary: {
+            main: colorMode === "light" ? "#845ef7" : "#a78bfa",
+          },
+          background: {
+            default: colorMode === "light" ? "#f7f8ff" : "#0b1220",
+            paper: colorMode === "light" ? "#ffffff" : "#0f172a",
+          },
+        },
+        shape: { borderRadius: 12 },
+        typography: {
+          fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        },
+      }),
+    [colorMode]
+  );
 
   const savePromptToHistory = (prompt) => {
     if (!history.includes(prompt)) {
@@ -177,93 +216,193 @@ function App() {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Synthetic Data Generator
-      </Typography>
-      <Box sx={{ display: "flex", gap: 2, mb: 2, alignItems: "center" }}>
-        <Select value={format} onChange={(e) => setFormat(e.target.value)} size="small">
-          <MenuItem value="json">JSON</MenuItem>
-          <MenuItem value="csv">CSV</MenuItem>
-        </Select>
-        <Button variant="contained" onClick={handleGenerate} disabled={loading}>
-          Generate
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={handleDownload}
-          disabled={!dataset || dataset.format !== format}
-          startIcon={<DownloadIcon />}
-        >
-          Download {format.toUpperCase()}
-        </Button>
-      </Box>
-      <TextField
-        label="Prompt"
-        multiline
-        fullWidth
-        minRows={4}
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        sx={{ mb: 3 }}
-        placeholder="e.g. Generate 20 sample users with name, email, and signup date"
-      />
-
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 3 }}>
-        {SAMPLE_PROMPTS.map((example) => (
-          <Chip
-            key={example}
-            label={example}
-            size="small"
-            variant={prompt === example ? "filled" : "outlined"}
-            onClick={() => setPrompt(example)}
-          />
-        ))}
-      </Box>
-
-      {history.length > 0 && (
-        <Paper variant="outlined" sx={{ p: 2, mb: 4 }}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-            <Typography variant="h6">
-              Prompt History
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AppBar
+        position="sticky"
+        color="transparent"
+        elevation={0}
+        sx={{
+          backdropFilter: "blur(12px)",
+          backgroundColor:
+            colorMode === "light" ? "rgba(255,255,255,0.82)" : "rgba(10,16,30,0.78)",
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
+      >
+        <Toolbar sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              Synthetic Data Generator
             </Typography>
-            <Button size="small" onClick={handleClearHistory} disabled={history.length === 0}>
-              Clear History
-            </Button>
+            <Typography variant="body2" color="text.secondary">
+              Prompt → preview → filter → download
+            </Typography>
           </Box>
-          {history.map((item, idx) => (
-            <Box
-              key={idx}
-              sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}
-            >
-              <Button variant="text" onClick={() => handleHistoryClick(item)}>{item}</Button>
-              <IconButton color="error" onClick={() => openDeleteDialog(item)}>
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          ))}
-        </Paper>
-      )}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <IconButton onClick={() => setColorMode((prev) => (prev === "light" ? "dark" : "light"))}>
+              {colorMode === "light" ? <AutoAwesomeIcon /> : <Brightness7Icon />}
+            </IconButton>
+          </Stack>
+        </Toolbar>
+      </AppBar>
 
-      {loading && (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      )}
+      <Box
+        sx={{
+          minHeight: "100vh",
+          background:
+            colorMode === "light"
+              ? "radial-gradient(circle at 15% 20%, rgba(255,119,132,0.18) 0, transparent 28%), radial-gradient(circle at 80% 0%, rgba(132,94,247,0.18) 0, transparent 25%), radial-gradient(circle at 60% 60%, rgba(255,214,102,0.18) 0, transparent 22%), linear-gradient(180deg, #fef9ff 0%, #f6f9ff 40%, #eef2ff 100%)"
+              : "radial-gradient(circle at 25% 20%, rgba(255,119,132,0.18) 0, transparent 28%), radial-gradient(circle at 80% 0%, rgba(132,94,247,0.2) 0, transparent 25%), radial-gradient(circle at 60% 60%, rgba(56,189,248,0.15) 0, transparent 22%), linear-gradient(180deg, #050910 0%, #0b1220 40%, #0f172a 100%)",
+          pb: 6,
+        }}
+      >
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <Stack spacing={3}>
+            <Card elevation={2} sx={{ transition: "transform 150ms ease, box-shadow 150ms ease", "&:hover": { transform: "translateY(-2px)", boxShadow: 8 } }}>
+              <CardContent>
+                <Stack spacing={2}>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+                  <Select
+                    value={format}
+                    onChange={(e) => setFormat(e.target.value)}
+                    size="small"
+                    sx={{ width: 140, backgroundColor: "background.paper" }}
+                  >
+                    <MenuItem value="json">JSON</MenuItem>
+                    <MenuItem value="csv">CSV</MenuItem>
+                  </Select>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="contained"
+                      startIcon={<RocketLaunchIcon />}
+                      onClick={handleGenerate}
+                      disabled={loading}
+                      sx={{
+                        textTransform: "none",
+                        px: 2.5,
+                        boxShadow: "0 10px 30px rgba(255,107,107,0.25)",
+                        "&:hover": { transform: "translateY(-1px) scale(1.01)" },
+                      }}
+                    >
+                      Generate
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={handleDownload}
+                      disabled={!dataset || dataset.format !== format}
+                      startIcon={<DownloadIcon />}
+                      sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
+                    >
+                      Download {format.toUpperCase()}
+                    </Button>
+                    <Button
+                      variant="text"
+                      startIcon={<ShuffleIcon />}
+                      onClick={() => {
+                        const randomPrompt = SAMPLE_PROMPTS[Math.floor(Math.random() * SAMPLE_PROMPTS.length)];
+                        setPrompt(randomPrompt);
+                      }}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Random prompt
+                    </Button>
+                  </Stack>
+                </Stack>
 
-      {dataset?.table && !loading && (
-        <Box ref={tableRef}>
-          <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>
-            Generated Data
-          </Typography>
-          {datasetSummary && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              {datasetSummary.rows} rows · {datasetSummary.columns} columns · {datasetSummary.format.toUpperCase()}
-            </Alert>
-          )}
-          <DataTable data={dataset.table} />
-        </Box>
-      )}
+                  <TextField
+                    label="Prompt"
+                    multiline
+                    fullWidth
+                    minRows={4}
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="e.g. Generate 20 sample users with name, email, and signup date"
+                  />
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {SAMPLE_PROMPTS.map((example) => (
+                      <Chip
+                        key={example}
+                        label={example}
+                        size="small"
+                        variant={prompt === example ? "filled" : "outlined"}
+                        onClick={() => setPrompt(example)}
+                        icon={<CelebrationIcon fontSize="small" />}
+                        sx={{
+                          borderRadius: 2,
+                          "&:hover": { transform: "translateY(-1px) scale(1.01)" },
+                        }}
+                      />
+                    ))}
+                  </Stack>
+
+                  {datasetSummary && (
+                    <Grow in timeout={200}>
+                      <Alert severity="info" icon={<CelebrationIcon fontSize="small" />}>
+                        {datasetSummary.rows} rows · {datasetSummary.columns} columns · {datasetSummary.format.toUpperCase()}
+                      </Alert>
+                    </Grow>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems="stretch">
+              <Card sx={{ flex: 1, transition: "transform 150ms ease, box-shadow 150ms ease", "&:hover": { transform: "translateY(-2px)", boxShadow: 8 } }}>
+                <CardContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="h6">Prompt History</Typography>
+                    <Button size="small" onClick={handleClearHistory} disabled={history.length === 0} startIcon={<HistoryIcon />}>
+                      Clear History
+                    </Button>
+                  </Stack>
+                  <Divider />
+                  {history.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">No prompts yet. Generate something to save it.</Typography>
+                  ) : (
+                    <Stack spacing={1.5}>
+                      {history.map((item, idx) => (
+                        <Stack
+                          key={idx}
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          spacing={1}
+                        >
+                          <Button variant="text" onClick={() => handleHistoryClick(item)} sx={{ textAlign: "left" }}>
+                            {item}
+                          </Button>
+                          <IconButton color="error" onClick={() => openDeleteDialog(item)} size="small">
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      ))}
+                    </Stack>
+                  )}
+                </CardContent>
+              </Card>
+            </Stack>
+
+            {loading && (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <CircularProgress />
+              </Box>
+            )}
+
+            {dataset?.table && !loading && (
+              <Card ref={tableRef} sx={{ transition: "transform 150ms ease, box-shadow 150ms ease", "&:hover": { transform: "translateY(-2px)", boxShadow: 10 } }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    Generated Data
+                  </Typography>
+                  <DataTable data={dataset.table} />
+                </CardContent>
+              </Card>
+            )}
+          </Stack>
+        </Container>
+      </Box>
 
       <Snackbar
         open={snackbar.open}
@@ -271,7 +410,7 @@ function App() {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <MuiAlert
+        <Alert
           elevation={6}
           variant="filled"
           severity={snackbar.severity}
@@ -300,7 +439,7 @@ function App() {
           sx={{ width: "100%" }}
         >
           {snackbar.message}
-        </MuiAlert>
+        </Alert>
       </Snackbar>
 
       <Dialog open={deleteDialogOpen} onClose={closeDeleteDialog}>
@@ -315,7 +454,7 @@ function App() {
           <Button color="error" onClick={handleDeletePrompt}>Delete</Button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </ThemeProvider>
   );
 }
 
