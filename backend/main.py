@@ -1,24 +1,47 @@
-from fastapi import FastAPI, HTTPException
+import logging
+import json
+import os
+import re
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from openai import OpenAI
 from typing import List, Literal
-import os
-import json
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 import pandas as pd
-import re
 
-# Load environment variables from .env
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
 load_dotenv()
 
-# Initialize OpenAI client with API key
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Initialize FastAPI app
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# App & middleware
+# ---------------------------------------------------------------------------
 app = FastAPI()
 
-# CORS config for frontend (localhost:3000)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -28,9 +51,22 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    raise HTTPException(
+        status_code=429,
+        detail="Too many requests – please try again later.",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Schemas
+# ---------------------------------------------------------------------------
 class DataRequest(BaseModel):
     prompt: str = Field(
-        ..., min_length=1, description="Prompt describing the dataset to generate"
+        ...,
+        min_length=1,
+        description="Prompt describing the dataset to generate",
     )
     format: Literal["json", "csv"] = "json"
 
@@ -58,8 +94,22 @@ DATASET_SCHEMA = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.post("/generate-data")
-async def generate_data(data_request: DataRequest):
+@limiter.limit("10/minute")
+async def generate_data(request: Request, data_request: DataRequest):
+    logger.info(
+        "generate-data  prompt=%r  format=%s",
+        data_request.prompt[:80],
+        data_request.format,
+    )
     try:
         content = request_dataset_from_openai(data_request.prompt)
         data = extract_json(content)
@@ -73,20 +123,25 @@ async def generate_data(data_request: DataRequest):
     except HTTPException:
         raise
     except ValueError as exc:
+        logger.warning("Bad value: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc))
     except Exception as exc:
+        logger.exception("Unexpected error")
         raise HTTPException(
             status_code=502,
             detail="Failed to generate synthetic data",
         ) from exc
 
 
+# ---------------------------------------------------------------------------
+# OpenAI helpers
+# ---------------------------------------------------------------------------
 def request_dataset_from_openai(prompt: str) -> str:
     response = client.responses.create(
-        model="gpt-4.1",
+        model=OPENAI_MODEL,
         input=(
-            "You are a service that produces synthetic tabular data. "
-            "Always return a JSON object that matches the "
+            "You are a service that produces synthetic tabular "
+            "data. Always return a JSON object that matches the "
             "provided schema and place all rows "
             "within the `rows` array."
             f"\n\nUser prompt: {prompt}"
