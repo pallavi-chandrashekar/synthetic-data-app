@@ -1,33 +1,106 @@
-
-
-# 🔄 Synthetic Data Generator (React + FastAPI + OpenAI)
+# Synthetic Data Generator
 
 ![Build Status](https://github.com/pallavi-chandrashekar/synthetic-data-app/actions/workflows/ci.yml/badge.svg?branch=main)
-<!-- Coverage badge removed until coverage tracking is implemented -->
-
 ![License](https://img.shields.io/github/license/pallavi-chandrashekar/synthetic-data-app)
 
-A full-stack web application that uses OpenAI to generate synthetic datasets based on user prompts. Supports export in JSON or CSV, interactive preview, and rich filtering with prompt history.
+A full-stack web application that uses OpenAI to generate synthetic datasets from natural language prompts. Supports JSON and CSV export, interactive preview with per-column filtering, prompt history, dark mode, and more.
 
 ---
 
-## 📚 Documentation & API
+## Features
 
-- **API Reference & Architecture:** See [ARCHITECTURE.md](./ARCHITECTURE.md) for backend API docs, usage examples, and system diagrams.
-- **Frontend:**
-  - Main entry: `frontend/src/App.jsx`
-  - Data table: `frontend/src/DataTable.jsx`
-  - API call: POST `/generate-data` (see below)
+- Natural language prompt to structured dataset (via OpenAI structured output)
+- JSON and CSV format selection
+- Interactive MUI DataGrid with per-column filtering (contains, starts with, regex), sorting, and pagination
+- Sample prompt chips and random prompt button
+- Dataset summary badge (rows, columns, format)
+- One-click download (JSON/CSV)
+- Prompt history with restore, delete (with confirmation), undo, and clear
+- Client-side caching of previous results
+- Dark / light mode toggle
+- Error boundary for graceful crash recovery
+- Rate limiting (10 requests/minute per IP)
+- Configurable OpenAI model via environment variable
+- Structured backend logging
 
-### Example API Usage
+---
 
-```bash
-curl -X POST http://localhost:8000/generate-data \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Generate 10 users with name and email", "format": "json"}'
+## Tech Stack
+
+| Layer       | Technology                        |
+|-------------|-----------------------------------|
+| Frontend    | React 18 + Vite                   |
+| UI          | Material UI (MUI) 5 + DataGrid    |
+| Backend     | FastAPI + Pydantic                |
+| LLM         | OpenAI API (structured output)    |
+| Rate Limit  | slowapi                           |
+| CSV Parsing | PapaParse (frontend)              |
+| State       | React Hooks + LocalStorage        |
+| Testing     | pytest (backend), Vitest (frontend) |
+
+---
+
+## Project Structure
+
+```
+synthetic-data-app/
+├── backend/
+│   ├── main.py               # FastAPI app: /health, /generate-data
+│   ├── test_main.py           # Backend unit tests (pytest, 12 tests)
+│   ├── requirements.txt
+│   ├── .env.example           # Environment variable template
+│   ├── .dockerignore
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx            # Main application component
+│   │   ├── DataTable.jsx      # DataGrid with per-column filtering
+│   │   ├── ErrorBoundary.jsx  # React error boundary
+│   │   ├── main.jsx           # Entry point
+│   │   ├── App.test.jsx       # App tests (11 tests)
+│   │   ├── DataTable.test.jsx # DataTable tests (4 tests)
+│   │   └── ErrorBoundary.test.jsx # ErrorBoundary tests (2 tests)
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── setupTests.js
+│   ├── .dockerignore
+│   └── Dockerfile
+├── .github/
+│   ├── workflows/ci.yml       # CI: lint, security scan, tests
+│   ├── dependabot.yaml
+│   └── ISSUE_TEMPLATE/
+├── .gitignore
+├── .pre-commit-config.yaml
+├── docker-compose.yml
+├── ARCHITECTURE.md
+└── README.md
 ```
 
-**Response:**
+---
+
+## API Reference
+
+### `GET /health`
+
+Returns service status.
+
+```json
+{ "status": "ok" }
+```
+
+### `POST /generate-data`
+
+Generate synthetic data from a natural language prompt. Rate limited to **10 requests/minute** per IP.
+
+**Request:**
+```json
+{
+  "prompt": "Generate 10 users with name and email",
+  "format": "json"
+}
+```
+
+**Response (JSON):**
 ```json
 {
   "json": [
@@ -37,145 +110,106 @@ curl -X POST http://localhost:8000/generate-data \
 }
 ```
 
----
-
-## ✨ Features
-
-- 🧠 Natural language prompt → synthetic dataset (via OpenAI)
-- 🔄 JSON & CSV format selection
-- 📊 Interactive MUI DataGrid table
-  - Column-specific filtering, regex and startsWith modes
-  - Sorting and pagination
-- 🧭 UX helpers: sample prompt chips, dataset summary (rows/cols/format), clearable history
-- 💾 One-click download (JSON/CSV)
-- 📜 Prompt history with restore, delete, and undo
-- ⏳ Loading spinner during API call
-- 🔗 Pagination state synced with URL (optional)
-
----
-
-## 🛠️ Tech Stack
-
-| Layer       | Technology         |
-|-------------|--------------------|
-| Frontend    | React + Vite       |
-| UI          | Material UI (MUI)  |
-| Backend     | FastAPI            |
-| LLM         | OpenAI API         |
-| Styling     | MUI + CSS          |
-| State       | React Hooks + LocalStorage |
-
----
-
-
-## 📂 Project Structure
-
-```
-synthetic-data-app/
-├── backend/
-│   ├── .env                  # contains OPENAI_API_KEY
-│   ├── main.py               # FastAPI backend with /generate-data route
-│   ├── requirements.txt
-│   └── Dockerfile            # backend container
-│   └── test_main.py          # backend unit tests (pytest)
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── DataTable.jsx
-│   │   ├── main.jsx
-│   │   └── App.test.jsx      # frontend unit tests (Vitest)
-│   ├── public/
-│   │   └── index.html
-│   ├── package.json
-│   ├── vite.config.js
-│   └── Dockerfile            # frontend container
-│   └── setupTests.js         # test setup for React Testing Library
-├── docker-compose.yml        # multi-container orchestration
-└── README.md
+**Response (CSV):**
+```json
+{
+  "csv": "name,email\nAlice,alice@example.com\nBob,bob@example.com\n"
+}
 ```
 
+**Error responses:**
+| Status | Meaning |
+|--------|---------|
+| 422    | Invalid request (empty prompt, bad format) |
+| 429    | Rate limit exceeded |
+| 502    | OpenAI error or malformed response |
+
 ---
 
+## Getting Started
 
-## 🐳 Docker Setup (Optional)
-
-You can run the entire stack with Docker and docker-compose:
+### 1. Clone the repo
 
 ```bash
-docker-compose up --build
-```
-
-This will start both backend (FastAPI, port 8000) and frontend (Vite, port 3000) containers. Make sure to set your `OPENAI_API_KEY` in `backend/.env`.
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/your-username/synthetic-data-app.git
+git clone https://github.com/pallavi-chandrashekar/synthetic-data-app.git
 cd synthetic-data-app
 ```
 
-### 2. Backend (FastAPI)
+### 2. Backend
 
 ```bash
 cd backend
+cp .env.example .env        # then add your OpenAI API key
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-#### Running Backend Tests
-
-To run unit tests for the FastAPI backend:
+### 3. Frontend
 
 ```bash
-cd backend
-# (Activate your virtual environment if not already active)
-pytest
-```
-
-This will discover and run all tests in files named like `test_*.py`.
-
-Ensure your `.env` file contains:
-
-```
-OPENAI_API_KEY=your-api-key-here
-```
-
-### 3. Frontend (React + Vite)
-
-```bash
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 ```
 
-**Configuration**
-
-- `VITE_API_URL` (optional): set this to point the frontend at a non-local backend API base.
-
-#### Running Frontend Unit Tests
-
-To run unit tests for the React frontend (using Vitest and React Testing Library):
-
-```bash
-cd frontend
-npx vitest
-```
-
-This will discover and run all tests in files named like `*.test.jsx`.
-
-Visit: [http://localhost:3000](http://localhost:3000)
+Visit [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🧪 Sample Prompts
+## Environment Variables
 
-```txt
+### Backend (`backend/.env`)
+
+| Variable         | Required | Default   | Description                     |
+|------------------|----------|-----------|---------------------------------|
+| `OPENAI_API_KEY` | Yes      | -         | Your OpenAI API key             |
+| `OPENAI_MODEL`   | No       | `gpt-4.1` | OpenAI model to use            |
+
+### Frontend
+
+| Variable       | Required | Default                | Description               |
+|----------------|----------|------------------------|---------------------------|
+| `VITE_API_URL` | No       | `http://localhost:8000` | Backend API base URL      |
+
+---
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+Starts both backend (port 8000) and frontend (port 3000). Set your `OPENAI_API_KEY` in `backend/.env` before building.
+
+---
+
+## Running Tests
+
+### Backend
+
+```bash
+cd backend
+pytest -v
+```
+
+12 tests covering: health endpoint, JSON extraction (valid, rows wrapper, extra text, array preference), error cases (invalid JSON, non-list, non-dict rows), generate endpoint (JSON/CSV), error handling, and input validation.
+
+### Frontend
+
+```bash
+cd frontend
+npx vitest run
+```
+
+17 tests covering: App rendering, format selector, prompt field, sample chips, prompt history, generate flow, API error handling, DataTable (empty/invalid/valid data), and ErrorBoundary (normal/crash).
+
+---
+
+## Sample Prompts
+
+```
 Generate 50 fake customer profiles with fields: name, email, age, country
 Generate 100 sales records with product, quantity, revenue, and date
 Generate a dataset of employee records with id, name, role, and joining_date
@@ -184,57 +218,29 @@ Generate 25 SaaS subscriptions with plan_name, mrr, user_count, and status
 
 ---
 
-## 🎉 Local birthday site & slides (Prisha)
+## Screenshots
 
-These assets live outside the repo (requested keepsake content) but are noted here for convenience:
+<img width="1233" height="462" alt="Prompt input view" src="https://github.com/user-attachments/assets/3b89e5f6-1e82-423b-82ae-a7101ff652bc" />
 
-- Birthday site: `/Users/pallavichandrashekar/Codex/prisha-birthday/index.php`  
-  - Serve locally: `php -S 127.0.0.1:8080 -t /Users/pallavichandrashekar/Codex/prisha-birthday`
-- Browser slides + narration: `/Users/pallavichandrashekar/Codex/prisha-birthday/web-slides/index.html`  
-  - Serve locally: `php -S 127.0.0.1:8081 -t /Users/pallavichandrashekar/Codex/prisha-birthday/web-slides`
-  - Audio file: `web-slides/assets/prisha-slides-narration.m4a`
-- PPTX export: `/Users/pallavichandrashekar/Codex/prisha-birthday/Prisha_First_Year_Slides.pptx`
-
-Stop either PHP dev server with `kill <pid>` when done.
+<img width="1181" height="839" alt="Generated data table view" src="https://github.com/user-attachments/assets/4f0fce26-717a-4190-84e0-a4a928eef14e" />
 
 ---
 
-## 📸 Screenshots
-<img width="1233" height="462" alt="Screenshot 2025-07-17 at 4 52 40 PM" src="https://github.com/user-attachments/assets/3b89e5f6-1e82-423b-82ae-a7101ff652bc" />
-
-<img width="1181" height="839" alt="Screenshot 2025-07-17 at 4 53 30 PM" src="https://github.com/user-attachments/assets/4f0fce26-717a-4190-84e0-a4a928eef14e" />
-
-
----
-
-
-## 📃 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-
-## 🔄 Automated Dependency Updates
+## Automated Dependency Updates
 
 This repository uses [Dependabot](https://docs.github.com/en/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically/about-dependabot-version-updates) to keep dependencies up to date:
 
-- **Frontend**: Checks npm dependencies in `/frontend` weekly
-- **Backend**: Checks pip dependencies in `/backend` weekly
-
-Pull requests will be automatically opened for outdated dependencies.
+- **Frontend**: npm dependencies checked weekly
+- **Backend**: pip dependencies checked weekly
 
 ---
 
-
-## 🚀 Showcase & Community
-
-- ⭐ Star this repo to support the project!
-- 💬 Share your feedback, ideas, or questions via [issues](https://github.com/pallavi-chandrashekar/synthetic-data-app/issues).
-- 🌐 Share on social media, blogs, or developer communities.
-- 🧑‍💻 Try the app live: <!-- Add your demo link here, e.g. Vercel/Netlify/Render -->
-- 🏷️ Add topics/tags to help others discover this project.
-
-## 🙌 Contributing
+## Contributing
 
 PRs are welcome! Please open an issue for feature requests or bugs.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
