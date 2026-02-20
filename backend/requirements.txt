@@ -4,5 +4,5 @@ openai
 pydantic
 python-multipart
 pandas
-dotenv
+python-dotenv
 pytest

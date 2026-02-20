@@ -75,7 +75,10 @@ async def generate_data(data_request: DataRequest):
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=502, detail="Failed to generate synthetic data") from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to generate synthetic data",
+        ) from exc
 
 
 def request_dataset_from_openai(prompt: str) -> str:
@@ -83,7 +86,8 @@ def request_dataset_from_openai(prompt: str) -> str:
         model="gpt-4.1",
         input=(
             "You are a service that produces synthetic tabular data. "
-            "Always return a JSON object that matches the provided schema and place all rows "
+            "Always return a JSON object that matches the "
+            "provided schema and place all rows "
             "within the `rows` array."
             f"\n\nUser prompt: {prompt}"
         ),
@@ -103,7 +107,10 @@ def request_dataset_from_openai(prompt: str) -> str:
         first_content = first_output.content[0]
         return first_content.text
     except (AttributeError, IndexError) as exc:
-        raise HTTPException(status_code=502, detail="Malformed response from OpenAI") from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Malformed response from OpenAI",
+        ) from exc
 
 
 def extract_json(content: str) -> List[dict]:
