@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import DataTable from './DataTable.jsx';
-import React from 'react';
 
 const sampleData = [
   { name: 'Alice', age: '30', country: 'US' },

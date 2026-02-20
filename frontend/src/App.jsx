@@ -36,8 +36,9 @@ import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import ShuffleIcon from "@mui/icons-material/Shuffle";
-import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import DataTable from "./DataTable";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -181,6 +182,57 @@ function App() {
     a.href = url;
     a.download = `synthetic_data.${dataset.format}`;
     a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyToClipboard = async () => {
+    if (!dataset) return;
+    const text =
+      dataset.format === "json"
+        ? JSON.stringify(dataset.raw, null, 2)
+        : dataset.raw;
+    try {
+      await navigator.clipboard.writeText(text);
+      setSnackbar({ open: true, message: "Copied to clipboard", severity: "success" });
+    } catch {
+      setSnackbar({ open: true, message: "Failed to copy", severity: "error" });
+    }
+  };
+
+  const handleRegenerate = async () => {
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt) return;
+    const key = `${trimmedPrompt}__${format}`;
+    setCache((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/generate-data`, {
+        prompt: trimmedPrompt,
+        format,
+      });
+      const normalized = normalizeDataset(res.data, format);
+      setDataset(normalized);
+      setCache((prev) => ({ ...prev, [key]: normalized }));
+      savePromptToHistory(trimmedPrompt);
+      setSnackbar({ open: true, message: "Data regenerated", severity: "success" });
+      setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
+    } catch (err) {
+      const message = err.response?.data?.detail || err.message || "Error generating data";
+      setSnackbar({ open: true, message, severity: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePromptKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleGenerate();
+    }
   };
 
   const handleHistoryClick = (item) => {
@@ -297,6 +349,24 @@ function App() {
                       Download {format.toUpperCase()}
                     </Button>
                     <Button
+                      variant="outlined"
+                      onClick={handleCopyToClipboard}
+                      disabled={!dataset}
+                      startIcon={<ContentCopyIcon />}
+                      sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
+                    >
+                      Copy
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={handleRegenerate}
+                      disabled={loading || !prompt.trim()}
+                      startIcon={<RefreshIcon />}
+                      sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
+                    >
+                      Re-generate
+                    </Button>
+                    <Button
                       variant="text"
                       startIcon={<ShuffleIcon />}
                       onClick={() => {
@@ -317,7 +387,9 @@ function App() {
                     minRows={4}
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={handlePromptKeyDown}
                     placeholder="e.g. Generate 20 sample users with name, email, and signup date"
+                    helperText="Press Ctrl+Enter / Cmd+Enter to generate"
                   />
 
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>

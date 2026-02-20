@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-      branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  backend-tests:
+  backend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,14 +22,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install bandit
+          pip install bandit flake8 pytest-cov
       - name: Create .env file
         run: echo "OPENAI_API_KEY=testkey" > .env
+      - name: Lint (flake8)
+        run: flake8 .
       - name: Security scan (Bandit)
         run: bandit -r . --skip B101
-      - name: Run backend tests
-        run: pytest
-  frontend-tests:
+      - name: Run tests with coverage
+        run: pytest --cov=main --cov-report=term-missing
+
+  frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -42,7 +45,9 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: npm install
+      - name: Lint (eslint)
+        run: ESLINT_USE_FLAT_CONFIG=false npx eslint src/ --ext .js,.jsx
       - name: Security scan (npm audit)
         run: npm audit --audit-level=moderate || true
-      - name: Run frontend tests
+      - name: Run tests
         run: npx vitest run

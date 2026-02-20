@@ -32,7 +32,7 @@ def test_extract_json_with_extra_text():
     assert result[1]["b"] == 4
 
 
-def test_extract_json_prefers_array_when_both_present():
+def test_extract_json_prefers_array():
     content = (
         'Wrapper {"note": "ignored"} and array:' ' [{"c": 1}, {"c": 2}] trailing text'
     )
@@ -61,9 +61,12 @@ def test_extract_json_non_dict_row_raises():
     [("json", "json"), ("csv", "csv")],
 )
 def test_generate_data(monkeypatch, format_type, expected_key):
+    async def mock_openai(prompt):
+        return '{"rows": [{"x": 1}, {"x": 2}]}'
+
     monkeypatch.setattr(
         "main.request_dataset_from_openai",
-        lambda prompt: '{"rows": [{"x": 1}, {"x": 2}]}',
+        mock_openai,
     )
     payload = {
         "prompt": "2 rows of x",
@@ -75,10 +78,10 @@ def test_generate_data(monkeypatch, format_type, expected_key):
 
 
 def test_generate_data_error(monkeypatch):
-    def _raise(prompt):
+    async def mock_raise(prompt):
         raise ValueError("API error")
 
-    monkeypatch.setattr("main.request_dataset_from_openai", _raise)
+    monkeypatch.setattr("main.request_dataset_from_openai", mock_raise)
     payload = {"prompt": "fail", "format": "json"}
     response = client.post("/generate-data", json=payload)
     assert response.status_code == 502
@@ -87,5 +90,14 @@ def test_generate_data_error(monkeypatch):
 
 def test_generate_data_empty_prompt():
     payload = {"prompt": "", "format": "json"}
+    response = client.post("/generate-data", json=payload)
+    assert response.status_code == 422
+
+
+def test_generate_data_prompt_too_long():
+    payload = {
+        "prompt": "x" * 3000,
+        "format": "json",
+    }
     response = client.post("/generate-data", json=payload)
     assert response.status_code == 422

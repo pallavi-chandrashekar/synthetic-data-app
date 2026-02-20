@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App, { SAMPLE_PROMPTS } from './App.jsx';
-import React from 'react';
 import { vi } from 'vitest';
 import axios from 'axios';
 

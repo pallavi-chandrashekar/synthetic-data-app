@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI
 from typing import List, Literal
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -21,8 +21,15 @@ import pandas as pd
 load_dotenv()
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
+MAX_PROMPT_LENGTH = int(os.getenv("MAX_PROMPT_LENGTH", "2000"))
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+CORS_ORIGINS = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if o.strip()
+]
+
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -44,7 +51,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,7 +62,7 @@ app.add_middleware(
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     raise HTTPException(
         status_code=429,
-        detail="Too many requests – please try again later.",
+        detail="Too many requests \u2013 please try again later.",
     )
 
 
@@ -66,6 +73,7 @@ class DataRequest(BaseModel):
     prompt: str = Field(
         ...,
         min_length=1,
+        max_length=MAX_PROMPT_LENGTH,
         description="Prompt describing the dataset to generate",
     )
     format: Literal["json", "csv"] = "json"
@@ -111,7 +119,7 @@ async def generate_data(request: Request, data_request: DataRequest):
         data_request.format,
     )
     try:
-        content = request_dataset_from_openai(data_request.prompt)
+        content = await request_dataset_from_openai(data_request.prompt)
         data = extract_json(content)
 
         if data_request.format == "csv":
@@ -136,14 +144,16 @@ async def generate_data(request: Request, data_request: DataRequest):
 # ---------------------------------------------------------------------------
 # OpenAI helpers
 # ---------------------------------------------------------------------------
-def request_dataset_from_openai(prompt: str) -> str:
-    response = client.responses.create(
+async def request_dataset_from_openai(
+    prompt: str,
+) -> str:
+    response = await client.responses.create(
         model=OPENAI_MODEL,
         input=(
-            "You are a service that produces synthetic tabular "
-            "data. Always return a JSON object that matches the "
-            "provided schema and place all rows "
-            "within the `rows` array."
+            "You are a service that produces synthetic "
+            "tabular data. Always return a JSON object "
+            "that matches the provided schema and place "
+            "all rows within the `rows` array."
             f"\n\nUser prompt: {prompt}"
         ),
         response_format={
