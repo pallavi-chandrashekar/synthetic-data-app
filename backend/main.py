@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI
 import os
 import json
 import pandas as pd
@@ -12,7 +12,7 @@ import re
 load_dotenv()
 
 # Initialize OpenAI client with API key
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -26,22 +26,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Request payload schema
 class DataRequest(BaseModel):
     prompt: str
     format: str = "json"  # or "csv"
+
 
 # POST endpoint to generate synthetic data
 @app.post("/generate-data")
 async def generate_data(data_request: DataRequest):
     try:
         # Call OpenAI ChatCompletion API
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4.1",
             messages=[
                 {
                     "role": "user",
-                    "content": f"Generate synthetic data in valid JSON format:\n{data_request.prompt}"
+                    "content": (
+                        "Generate synthetic data in valid JSON format:\n"
+                        f"{data_request.prompt}"
+                    ),
                 }
             ],
             temperature=0.7,
@@ -60,7 +65,8 @@ async def generate_data(data_request: DataRequest):
 
     except Exception as e:
         return {"error": str(e)}
-    
+
+
 def extract_json(content):
     try:
         return json.loads(content)
