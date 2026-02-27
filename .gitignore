@@ -34,6 +34,6 @@ playwright/.cache/
 
 backend/.env
 
-## E2E demo generated assets
-frontend/e2e/audio/
-frontend/e2e/output/
+## E2E demo / video pipeline
+frontend/e2e/
+frontend/playwright.config.js
