@@ -37,6 +37,8 @@ playwright/.cache/
 
 backend/.env
 
-## E2E demo / video pipeline
-frontend/e2e/
-frontend/playwright.config.js
+## E2E demo / video & audio pipeline
+frontend/e2e/generate-voiceover.mjs
+frontend/e2e/merge-video.sh
+frontend/e2e/audio/
+frontend/e2e/output/
