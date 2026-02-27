@@ -224,13 +224,6 @@ Generate 25 SaaS subscriptions with plan_name, mrr, user_count, and status
 
 ---
 
-## Screenshots
-
-<img width="1233" height="462" alt="Prompt input view" src="https://github.com/user-attachments/assets/3b89e5f6-1e82-423b-82ae-a7101ff652bc" />
-
-<img width="1181" height="839" alt="Generated data table view" src="https://github.com/user-attachments/assets/4f0fce26-717a-4190-84e0-a4a928eef14e" />
-
----
 
 ## Automated Dependency Updates
 
