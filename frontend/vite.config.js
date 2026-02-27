@@ -11,5 +11,6 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./setupTests.js'],
+    exclude: ['node_modules', 'e2e', 'dist', 'vite.config.test.js', 'vitest.config.coverage.js'],
   },
 });

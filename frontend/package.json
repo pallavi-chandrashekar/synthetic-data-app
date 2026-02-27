@@ -2,6 +2,7 @@
   "name": "synthetic-data-app",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,7 +12,10 @@
     "e2e:report": "npx playwright show-report",
     "e2e:voiceover": "node e2e/generate-voiceover.mjs",
     "e2e:merge": "bash e2e/merge-video.sh",
-    "e2e:demo": "npm run e2e && npm run e2e:voiceover && npm run e2e:merge"
+    "e2e:demo": "npm run e2e && npm run e2e:voiceover && npm run e2e:merge",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -21,7 +25,6 @@
     "@mui/material": "^5.15.0",
     "@mui/x-data-grid": "^5.17.24",
     "axios": "^1.6.8",
-    "eslint": "^9.31.0",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -30,8 +33,10 @@
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "@vitejs/plugin-react": "^4.0.3",
     "dotenv": "^17.3.1",
+    "eslint": "^9.31.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-vitest-globals": "^1.5.0",
     "jsdom": "^26.1.0",
