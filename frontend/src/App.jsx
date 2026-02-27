@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   Chip,
-  CircularProgress,
   Container,
   CssBaseline,
   Dialog,
@@ -20,6 +19,7 @@ import {
   Divider,
   IconButton,
   MenuItem,
+  Skeleton,
   Snackbar,
   Select,
   Stack,
@@ -85,6 +85,7 @@ function App() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [promptToDelete, setPromptToDelete] = useState(null);
   const [colorMode, setColorMode] = useState("light");
+  const [rowCount, setRowCount] = useState(10);
   const tableRef = useRef(null);
 
   const datasetSummary = useMemo(() => {
@@ -136,7 +137,7 @@ function App() {
 
   const handleGenerate = async () => {
     const trimmedPrompt = prompt.trim();
-    const key = `${trimmedPrompt}__${format}`;
+    const key = `${trimmedPrompt}__${format}__${rowCount}`;
 
     if (!trimmedPrompt) return;
 
@@ -150,7 +151,7 @@ function App() {
     setLoading(true);
     try {
       const res = await axios.post(`${API_BASE_URL}/generate-data`, {
-        prompt: trimmedPrompt,
+        prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
         format,
       });
       const normalized = normalizeDataset(res.data, format);
@@ -202,7 +203,7 @@ function App() {
   const handleRegenerate = async () => {
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) return;
-    const key = `${trimmedPrompt}__${format}`;
+    const key = `${trimmedPrompt}__${format}__${rowCount}`;
     setCache((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -211,7 +212,7 @@ function App() {
     setLoading(true);
     try {
       const res = await axios.post(`${API_BASE_URL}/generate-data`, {
-        prompt: trimmedPrompt,
+        prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
         format,
       });
       const normalized = normalizeDataset(res.data, format);
@@ -329,17 +330,31 @@ function App() {
                     value={format}
                     onChange={(e) => setFormat(e.target.value)}
                     size="small"
+                    inputProps={{ "aria-label": "Output format" }}
                     sx={{ width: 140, backgroundColor: "background.paper" }}
                   >
                     <MenuItem value="json">JSON</MenuItem>
                     <MenuItem value="csv">CSV</MenuItem>
                   </Select>
-                  <Stack direction="row" spacing={1}>
+                  <TextField
+                    type="number"
+                    label="Rows"
+                    size="small"
+                    value={rowCount}
+                    onChange={(e) => {
+                      const v = Math.max(1, Math.min(1000, Number(e.target.value) || 1));
+                      setRowCount(v);
+                    }}
+                    inputProps={{ min: 1, max: 1000, "aria-label": "Number of rows" }}
+                    sx={{ width: 100, backgroundColor: "background.paper" }}
+                  />
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                     <Button
                       variant="contained"
                       startIcon={<RocketLaunchIcon />}
                       onClick={handleGenerate}
                       disabled={loading}
+                      aria-label="Generate data"
                       sx={{
                         textTransform: "none",
                         px: 2.5,
@@ -354,6 +369,7 @@ function App() {
                       onClick={handleDownload}
                       disabled={!dataset || dataset.format !== format}
                       startIcon={<DownloadIcon />}
+                      aria-label={`Download ${format.toUpperCase()}`}
                       sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
                     >
                       Download {format.toUpperCase()}
@@ -363,6 +379,7 @@ function App() {
                       onClick={handleCopyToClipboard}
                       disabled={!dataset}
                       startIcon={<ContentCopyIcon />}
+                      aria-label="Copy to clipboard"
                       sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
                     >
                       Copy
@@ -372,6 +389,7 @@ function App() {
                       onClick={handleRegenerate}
                       disabled={loading || !prompt.trim()}
                       startIcon={<RefreshIcon />}
+                      aria-label="Re-generate data"
                       sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
                     >
                       Re-generate
@@ -379,6 +397,7 @@ function App() {
                     <Button
                       variant="text"
                       startIcon={<ShuffleIcon />}
+                      aria-label="Random prompt"
                       onClick={() => {
                         const randomPrompt = SAMPLE_PROMPTS[Math.floor(Math.random() * SAMPLE_PROMPTS.length)];
                         setPrompt(randomPrompt);
@@ -435,7 +454,7 @@ function App() {
                 <CardContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Typography variant="h6">Prompt History</Typography>
-                    <Button size="small" onClick={handleClearHistory} disabled={history.length === 0} startIcon={<HistoryIcon />}>
+                    <Button size="small" onClick={handleClearHistory} disabled={history.length === 0} startIcon={<HistoryIcon />} aria-label="Clear history">
                       Clear History
                     </Button>
                   </Stack>
@@ -452,10 +471,10 @@ function App() {
                           justifyContent="space-between"
                           spacing={1}
                         >
-                          <Button variant="text" onClick={() => handleHistoryClick(item)} sx={{ textAlign: "left" }}>
+                          <Button variant="text" onClick={() => handleHistoryClick(item)} aria-label={`Use prompt: ${item}`} sx={{ textAlign: "left" }}>
                             {item}
                           </Button>
-                          <IconButton color="error" onClick={() => openDeleteDialog(item)} size="small">
+                          <IconButton color="error" onClick={() => openDeleteDialog(item)} size="small" aria-label={`Delete prompt: ${item}`}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Stack>
@@ -467,9 +486,19 @@ function App() {
             </Stack>
 
             {loading && (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                <CircularProgress />
-              </Box>
+              <Card>
+                <CardContent>
+                  <Skeleton variant="text" width={180} height={32} sx={{ mb: 2 }} />
+                  <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} variant="rectangular" width={120} height={28} sx={{ borderRadius: 1 }} />
+                    ))}
+                  </Stack>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} variant="text" height={24} sx={{ my: 0.5 }} />
+                  ))}
+                </CardContent>
+              </Card>
             )}
 
             {dataset?.table && !loading && (

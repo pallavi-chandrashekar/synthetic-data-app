@@ -23,7 +23,7 @@ describe('App', () => {
 
   it('renders the prompt text field', () => {
     render(<App />);
-    expect(screen.getByLabelText(/prompt/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^prompt$/i)).toBeInTheDocument();
   });
 
   it('renders sample prompt chips', () => {
@@ -37,7 +37,7 @@ describe('App', () => {
     render(<App />);
     const chip = screen.getByText(SAMPLE_PROMPTS[0]);
     fireEvent.click(chip);
-    expect(screen.getByLabelText(/prompt/i).value).toBe(SAMPLE_PROMPTS[0]);
+    expect(screen.getByLabelText(/^prompt$/i).value).toBe(SAMPLE_PROMPTS[0]);
   });
 
   it('shows empty history message initially', () => {
@@ -47,7 +47,7 @@ describe('App', () => {
 
   it('generate button is present and enabled', () => {
     render(<App />);
-    const btn = screen.getByRole('button', { name: /^generate$/i });
+    const btn = screen.getByRole('button', { name: /^generate data$/i });
     expect(btn).toBeInTheDocument();
     expect(btn).not.toBeDisabled();
   });
@@ -64,9 +64,9 @@ describe('App', () => {
     });
 
     render(<App />);
-    const input = screen.getByLabelText(/prompt/i);
+    const input = screen.getByLabelText(/^prompt$/i);
     fireEvent.change(input, { target: { value: 'test prompt' } });
-    fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^generate data$/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/data generated successfully/i)).toBeInTheDocument();
@@ -77,9 +77,9 @@ describe('App', () => {
     axios.post.mockRejectedValueOnce(new Error('Network error'));
 
     render(<App />);
-    const input = screen.getByLabelText(/prompt/i);
+    const input = screen.getByLabelText(/^prompt$/i);
     fireEvent.change(input, { target: { value: 'fail prompt' } });
-    fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^generate data$/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/network error/i)).toBeInTheDocument();
@@ -92,10 +92,10 @@ describe('App', () => {
     });
 
     render(<App />);
-    fireEvent.change(screen.getByLabelText(/prompt/i), {
+    fireEvent.change(screen.getByLabelText(/^prompt$/i), {
       target: { value: 'history test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^generate data$/i }));
 
     await waitFor(() => {
       expect(screen.getByText('history test')).toBeInTheDocument();

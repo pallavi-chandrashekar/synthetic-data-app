@@ -27,6 +27,7 @@ export default class ErrorBoundary extends React.Component {
           </Typography>
           <Button
             variant="contained"
+            aria-label="Reload page"
             onClick={() => {
               this.setState({ hasError: false });
               window.location.reload();

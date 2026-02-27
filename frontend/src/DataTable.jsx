@@ -37,6 +37,7 @@ export default function DataTable({ data }) {
           onChange={(e) =>
             setColumnFilters((prev) => ({ ...prev, [key]: e.target.value }))
           }
+          inputProps={{ "aria-label": `Filter ${key}` }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -46,6 +47,7 @@ export default function DataTable({ data }) {
             endAdornment: columnFilters[key] ? (
               <IconButton
                 size="small"
+                aria-label={`Clear ${key} filter`}
                 onClick={() =>
                   setColumnFilters((prev) => {
                     const updated = { ...prev };
@@ -65,6 +67,7 @@ export default function DataTable({ data }) {
             onChange={(e) =>
               setFilterModes((prev) => ({ ...prev, [key]: e.target.value }))
             }
+            inputProps={{ "aria-label": `Filter mode for ${key}` }}
           >
             <MenuItem value="contains">Contains</MenuItem>
             <MenuItem value="startsWith">Starts with</MenuItem>
@@ -113,17 +116,19 @@ export default function DataTable({ data }) {
         Preview
       </Typography>
 
-      <div style={{ height: 600, width: "100%" }}>
-        <DataGrid
-          rows={filteredRows}
-          columns={columns}
-          pageSize={pageSize}
-          onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
-          rowsPerPageOptions={[5, 10, 25]}
-          pagination
-          disableRowSelectionOnClick
-        />
-      </div>
+      <Box sx={{ overflowX: "auto" }}>
+        <Box sx={{ minWidth: 600, height: 600 }}>
+          <DataGrid
+            rows={filteredRows}
+            columns={columns}
+            pageSize={pageSize}
+            onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
+            rowsPerPageOptions={[5, 10, 25]}
+            pagination
+            disableRowSelectionOnClick
+          />
+        </Box>
+      </Box>
     </Box>
   );
 }
