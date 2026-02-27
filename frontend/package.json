@@ -14,7 +14,7 @@
     "e2e:merge": "bash e2e/merge-video.sh",
     "e2e:demo": "npm run e2e && npm run e2e:voiceover && npm run e2e:merge",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --config vitest.config.coverage.js",
     "lint": "eslint src/"
   },
   "dependencies": {
