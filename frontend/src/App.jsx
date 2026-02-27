@@ -291,11 +291,21 @@ function App() {
               Prompt → preview → filter → download
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <IconButton onClick={() => setColorMode((prev) => (prev === "light" ? "dark" : "light"))}>
-              {colorMode === "light" ? <AutoAwesomeIcon /> : <Brightness7Icon />}
-            </IconButton>
-          </Stack>
+          <Button
+            variant="outlined"
+            size="small"
+            aria-label="Toggle theme"
+            onClick={() => setColorMode((prev) => (prev === "light" ? "dark" : "light"))}
+            startIcon={colorMode === "light" ? <AutoAwesomeIcon /> : <Brightness7Icon />}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 2,
+              fontWeight: 600,
+            }}
+          >
+            {colorMode === "light" ? "Dark Mode" : "Light Mode"}
+          </Button>
         </Toolbar>
       </AppBar>
 

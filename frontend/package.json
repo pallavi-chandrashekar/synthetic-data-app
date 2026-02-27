@@ -5,7 +5,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "npx playwright test",
+    "e2e:headed": "npx playwright test --headed",
+    "e2e:report": "npx playwright show-report",
+    "e2e:voiceover": "node e2e/generate-voiceover.mjs",
+    "e2e:merge": "bash e2e/merge-video.sh",
+    "e2e:demo": "npm run e2e && npm run e2e:voiceover && npm run e2e:merge"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -21,12 +27,15 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@vitejs/plugin-react": "^4.0.3",
+    "dotenv": "^17.3.1",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-vitest-globals": "^1.5.0",
     "jsdom": "^26.1.0",
+    "openai": "^6.22.0",
     "vite": "^7.0.5",
     "vitest": "^3.2.4"
   }

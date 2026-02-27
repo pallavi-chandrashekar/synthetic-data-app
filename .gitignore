@@ -21,9 +21,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+## Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 ## IDE / OS
 .DS_Store
 .vscode/
 .idea/
 
 backend/.env
+
+## E2E demo generated assets
+frontend/e2e/audio/
+frontend/e2e/output/
