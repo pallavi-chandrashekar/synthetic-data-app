@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-4.1")
     max_prompt_length: int = Field(default=2000)
     cors_origins: str = Field(default="http://localhost:3000")
+    sentry_dsn: str = Field(default="")
 
     @property
     def cors_origin_list(self) -> list[str]:

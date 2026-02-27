@@ -26,6 +26,7 @@
     "@mui/x-data-grid": "^5.17.24",
     "axios": "^1.6.8",
     "papaparse": "^5.4.1",
+    "@sentry/react": "^9.5.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

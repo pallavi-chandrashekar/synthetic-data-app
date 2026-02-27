@@ -1,3 +1,7 @@
+networks:
+  app-internal:
+    driver: bridge
+
 services:
   backend:
     build: ./backend
@@ -7,9 +11,42 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    restart: unless-stopped
+    networks:
+      - app-internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     ports:
       - "3000:8080"
-    environment:
-      - VITE_API_URL=http://localhost:8000
+    restart: unless-stopped
+    networks:
+      - app-internal
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

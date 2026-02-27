@@ -8,7 +8,34 @@ client = TestClient(app)
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {
+        "status": "healthy",
+        "checks": {"api_key_configured": "pass"},
+    }
+
+
+def test_health_deep_success(monkeypatch):
+    async def mock_models_list(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr("main.client.models.list", mock_models_list)
+    response = client.get("/health", params={"deep": "true"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert data["checks"]["openai_reachable"] == "pass"
+
+
+def test_health_deep_failure(monkeypatch):
+    async def mock_models_list(*args, **kwargs):
+        raise Exception("Connection refused")
+
+    monkeypatch.setattr("main.client.models.list", mock_models_list)
+    response = client.get("/health", params={"deep": "true"})
+    assert response.status_code == 503
+    data = response.json()
+    assert data["status"] == "degraded"
+    assert data["checks"]["openai_reachable"] == "fail"
 
 
 def test_extract_json_valid():

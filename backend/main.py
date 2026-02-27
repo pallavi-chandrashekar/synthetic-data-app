@@ -2,7 +2,8 @@ import hashlib
 import logging
 import json
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from openai import AsyncOpenAI, Timeout
@@ -12,7 +13,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import pandas as pd
+import sentry_sdk
 from cachetools import TTLCache
+from pythonjsonlogger.json import JsonFormatter
 
 from config import Settings
 
@@ -20,6 +23,13 @@ from config import Settings
 # Configuration
 # ---------------------------------------------------------------------------
 settings = Settings()
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+    )
 
 client = AsyncOpenAI(
     api_key=settings.openai_api_key,
@@ -34,12 +44,16 @@ def _cache_key(prompt: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Logging
+# Logging (structured JSON)
 # ---------------------------------------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(message)s",
+_handler = logging.StreamHandler()
+_handler.setFormatter(
+    JsonFormatter(
+        fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+        rename_fields={"asctime": "timestamp", "levelname": "level"},
+    )
 )
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -108,23 +122,48 @@ DATASET_SCHEMA = {
 # Routes
 # ---------------------------------------------------------------------------
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health(deep: bool = Query(False)):
+    checks = {}
+    healthy = True
+
+    # Check 1: API key configured (always runs)
+    api_key_set = bool(settings.openai_api_key)
+    checks["api_key_configured"] = "pass" if api_key_set else "fail"
+    if not api_key_set:
+        healthy = False
+
+    # Check 2: OpenAI reachable (only with ?deep=true)
+    if deep:
+        try:
+            await client.models.list()
+            checks["openai_reachable"] = "pass"
+        except Exception as exc:
+            logger.warning("Deep health check failed", extra={"error": str(exc)})
+            checks["openai_reachable"] = "fail"
+            healthy = False
+
+    status_code = 200 if healthy else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "healthy" if healthy else "degraded", "checks": checks},
+    )
 
 
 @app.post("/generate-data")
 @limiter.limit("10/minute")
 async def generate_data(request: Request, data_request: DataRequest):
     logger.info(
-        "generate-data  prompt=%r  format=%s",
-        data_request.prompt[:80],
-        data_request.format,
+        "generate-data request received",
+        extra={
+            "prompt_prefix": data_request.prompt[:80],
+            "format": data_request.format,
+        },
     )
     try:
         key = _cache_key(data_request.prompt)
         cached = _response_cache.get(key)
         if cached is not None:
-            logger.info("cache-hit  key=%s", key[:12])
+            logger.info("cache hit", extra={"cache_key": key[:12]})
             content = cached
         else:
             content = await request_dataset_from_openai(data_request.prompt)
