@@ -9,7 +9,8 @@ A full-stack web application that uses OpenAI to generate synthetic datasets fro
 
 ## Demo
 
-https://github.com/user-attachments/assets/e162c9fc-aa12-474c-aa22-39945f136571
+https://github.com/user-attachments/assets/3580e31e-9b7a-4b60-9081-b2c7f358df70
+
 
 ---
 
