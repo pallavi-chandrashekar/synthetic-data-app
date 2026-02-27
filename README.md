@@ -9,9 +9,7 @@ A full-stack web application that uses OpenAI to generate synthetic datasets fro
 
 ## Demo
 
-https://github.com/user-attachments/assets/REPLACE_WITH_VIDEO_ID
-
-> To update: drag-and-drop `frontend/e2e/output/demo-with-voiceover.mp4` into a GitHub issue or PR comment, then replace the URL above with the generated link.
+https://github.com/user-attachments/assets/e162c9fc-aa12-474c-aa22-39945f136571
 
 ---
 
