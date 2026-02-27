@@ -153,7 +153,7 @@ function App() {
       const res = await axios.post(`${API_BASE_URL}/generate-data`, {
         prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
         format,
-      });
+      }, { timeout: 30000 });
       const normalized = normalizeDataset(res.data, format);
       setDataset(normalized);
       setCache((prev) => ({ ...prev, [key]: normalized }));
@@ -214,7 +214,7 @@ function App() {
       const res = await axios.post(`${API_BASE_URL}/generate-data`, {
         prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
         format,
-      });
+      }, { timeout: 30000 });
       const normalized = normalizeDataset(res.data, format);
       setDataset(normalized);
       setCache((prev) => ({ ...prev, [key]: normalized }));

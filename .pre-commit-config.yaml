@@ -19,6 +19,6 @@ repos:
     hooks:
       - id: eslint
         name: eslint
-        entry: npx --prefix frontend eslint
+        entry: bash -c 'cd frontend && npx eslint "${@#frontend/}"' --
         language: system
         files: '^frontend/src/.*\.(js|jsx)$'

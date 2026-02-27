@@ -1,13 +1,12 @@
 import logging
 import json
 import os
-import re
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, Timeout
 from typing import List, Literal
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -29,7 +28,10 @@ CORS_ORIGINS = [
     if o.strip()
 ]
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    timeout=Timeout(timeout=30.0),
+)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -53,8 +55,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -178,18 +180,48 @@ async def request_dataset_from_openai(
         ) from exc
 
 
+def _find_balanced(content: str, open_ch: str, close_ch: str):
+    """Return the first balanced substring delimited by open_ch/close_ch, or None."""
+    start = content.find(open_ch)
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(content)):
+        ch = content[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == open_ch:
+            depth += 1
+        elif ch == close_ch:
+            depth -= 1
+            if depth == 0:
+                return content[start : i + 1]
+    return None
+
+
 def extract_json(content: str) -> List[dict]:
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
-        array_match = re.search(r"\[.*\]", content, re.DOTALL)
-        if array_match:
-            parsed = json.loads(array_match.group(0))
+        balanced = _find_balanced(content, "[", "]")
+        if balanced:
+            parsed = json.loads(balanced)
         else:
-            object_match = re.search(r"\{.*\}", content, re.DOTALL)
-            if not object_match:
+            balanced = _find_balanced(content, "{", "}")
+            if not balanced:
                 raise ValueError("Response did not contain valid JSON")
-            parsed = json.loads(object_match.group(0))
+            parsed = json.loads(balanced)
 
     if isinstance(parsed, dict) and "rows" in parsed:
         rows = parsed["rows"]

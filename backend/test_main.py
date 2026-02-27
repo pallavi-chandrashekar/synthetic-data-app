@@ -56,6 +56,14 @@ def test_extract_json_non_dict_row_raises():
         extract_json("[1, 2, 3]")
 
 
+def test_extract_json_deeply_nested_no_hang():
+    """Input that would cause catastrophic backtracking with the old regex."""
+    nested = '{"rows": [' + '{"a": {"b": {"c": 1}}},' * 200 + '{"a": {"b": {"c": 2}}}]}'
+    result = extract_json(nested)
+    assert len(result) == 201
+    assert result[-1]["a"]["b"]["c"] == 2
+
+
 @pytest.mark.parametrize(
     "format_type,expected_key",
     [("json", "json"), ("csv", "csv")],
