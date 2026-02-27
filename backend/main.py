@@ -1,11 +1,10 @@
+import hashlib
 import logging
 import json
-import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from dotenv import load_dotenv
 from openai import AsyncOpenAI, Timeout
 from typing import List, Literal
 from slowapi import Limiter
@@ -13,25 +12,26 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import pandas as pd
+from cachetools import TTLCache
+
+from config import Settings
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-load_dotenv()
-
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
-MAX_PROMPT_LENGTH = int(os.getenv("MAX_PROMPT_LENGTH", "2000"))
-
-CORS_ORIGINS = [
-    o.strip()
-    for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-    if o.strip()
-]
+settings = Settings()
 
 client = AsyncOpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
+    api_key=settings.openai_api_key,
     timeout=Timeout(timeout=30.0),
 )
+
+_response_cache = TTLCache(maxsize=256, ttl=600)  # 10-min TTL
+
+
+def _cache_key(prompt: str) -> str:
+    return hashlib.sha256(prompt.encode()).hexdigest()
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -53,7 +53,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
@@ -75,7 +75,7 @@ class DataRequest(BaseModel):
     prompt: str = Field(
         ...,
         min_length=1,
-        max_length=MAX_PROMPT_LENGTH,
+        max_length=settings.max_prompt_length,
         description="Prompt describing the dataset to generate",
     )
     format: Literal["json", "csv"] = "json"
@@ -121,7 +121,14 @@ async def generate_data(request: Request, data_request: DataRequest):
         data_request.format,
     )
     try:
-        content = await request_dataset_from_openai(data_request.prompt)
+        key = _cache_key(data_request.prompt)
+        cached = _response_cache.get(key)
+        if cached is not None:
+            logger.info("cache-hit  key=%s", key[:12])
+            content = cached
+        else:
+            content = await request_dataset_from_openai(data_request.prompt)
+            _response_cache[key] = content
         data = extract_json(content)
 
         if data_request.format == "csv":
@@ -150,7 +157,7 @@ async def request_dataset_from_openai(
     prompt: str,
 ) -> str:
     response = await client.responses.create(
-        model=OPENAI_MODEL,
+        model=settings.openai_model,
         input=(
             "You are a service that produces synthetic "
             "tabular data. Always return a JSON object "

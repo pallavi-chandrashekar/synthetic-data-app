@@ -1,6 +1,4 @@
-import { useMemo, useState, useRef } from "react";
-import axios from "axios";
-import Papa from "papaparse";
+import { useState } from "react";
 import {
   Alert,
   AppBar,
@@ -8,40 +6,24 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   Container,
   CssBaseline,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Divider,
-  IconButton,
-  MenuItem,
   Skeleton,
   Snackbar,
-  Select,
   Stack,
-  Grow,
-  TextField,
   Toolbar,
   Typography,
 } from "@mui/material";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
-import DeleteIcon from "@mui/icons-material/Delete";
-import DownloadIcon from "@mui/icons-material/Download";
-import HistoryIcon from "@mui/icons-material/History";
-import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
+import { ThemeProvider } from "@mui/material/styles";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
-import CelebrationIcon from "@mui/icons-material/Celebration";
-import ShuffleIcon from "@mui/icons-material/Shuffle";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import DataTable from "./DataTable";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import useThemeMode from "./hooks/useThemeMode";
+import usePromptHistory from "./hooks/usePromptHistory";
+import useDataGeneration from "./hooks/useDataGeneration";
+import PromptForm from "./components/PromptForm";
+import ActionBar from "./components/ActionBar";
+import HistoryPanel from "./components/HistoryPanel";
 
 export const SAMPLE_PROMPTS = [
   "Generate 50 fake customer profiles with fields: name, email, age, country",
@@ -50,222 +32,43 @@ export const SAMPLE_PROMPTS = [
   "Generate 25 SaaS subscriptions with plan_name, mrr, user_count, and status",
 ];
 
-const normalizeDataset = (payload, requestedFormat) => {
-  if (requestedFormat === "csv") {
-    const csvContent = payload?.csv;
-    if (!csvContent) {
-      throw new Error("CSV payload missing");
-    }
-    const parsed = Papa.parse(csvContent, { header: true, skipEmptyLines: true });
-    if (parsed.errors && parsed.errors.length) {
-      throw new Error(parsed.errors[0].message || "Failed to parse CSV payload");
-    }
-    return { format: "csv", table: parsed.data, raw: csvContent };
-  }
-
-  if (!Array.isArray(payload?.json)) {
-    throw new Error("JSON payload must be an array");
-  }
-
-  return { format: "json", table: payload.json, raw: payload.json };
-};
-
 function App() {
   const [prompt, setPrompt] = useState("");
-  const [dataset, setDataset] = useState(null);
   const [format, setFormat] = useState("json");
-  const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState(() => {
-    const saved = localStorage.getItem("promptHistory");
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const [recentlyDeleted, setRecentlyDeleted] = useState(null);
-  const [cache, setCache] = useState({});
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [promptToDelete, setPromptToDelete] = useState(null);
-  const [colorMode, setColorMode] = useState("light");
   const [rowCount, setRowCount] = useState(10);
-  const tableRef = useRef(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  const datasetSummary = useMemo(() => {
-    if (!dataset?.table || dataset.table.length === 0) {
-      return null;
-    }
-    const columns = new Set();
-    dataset.table.forEach((row) => {
-      Object.keys(row || {}).forEach((key) => columns.add(key));
-    });
-    return {
-      rows: dataset.table.length,
-      columns: columns.size,
-      format: dataset.format,
-    };
-  }, [dataset]);
+  const { colorMode, theme, toggleColorMode } = useThemeMode();
 
-  const theme = useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode: colorMode,
-          primary: {
-            main: colorMode === "light" ? "#ff6b6b" : "#ff8fb1",
-          },
-          secondary: {
-            main: colorMode === "light" ? "#845ef7" : "#a78bfa",
-          },
-          background: {
-            default: colorMode === "light" ? "#f7f8ff" : "#0b1220",
-            paper: colorMode === "light" ? "#ffffff" : "#0f172a",
-          },
-        },
-        shape: { borderRadius: 12 },
-        typography: {
-          fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        },
-      }),
-    [colorMode]
-  );
+  const {
+    history,
+    recentlyDeleted,
+    deleteDialogOpen,
+    promptToDelete,
+    savePromptToHistory,
+    handleDeletePrompt,
+    handleClearHistory,
+    openDeleteDialog,
+    closeDeleteDialog,
+    restoreDeleted,
+  } = usePromptHistory(setSnackbar);
 
-  const savePromptToHistory = (prompt) => {
-    if (!history.includes(prompt)) {
-      const newHistory = [prompt, ...history.slice(0, 9)];
-      setHistory(newHistory);
-      localStorage.setItem("promptHistory", JSON.stringify(newHistory));
-    }
-  };
-
-  const handleGenerate = async () => {
-    const trimmedPrompt = prompt.trim();
-    const key = `${trimmedPrompt}__${format}__${rowCount}`;
-
-    if (!trimmedPrompt) return;
-
-    if (cache[key]) {
-      setDataset(cache[key]);
-      setSnackbar({ open: true, message: "Loaded from history", severity: "info" });
-      setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await axios.post(`${API_BASE_URL}/generate-data`, {
-        prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
-        format,
-      }, { timeout: 30000 });
-      const normalized = normalizeDataset(res.data, format);
-      setDataset(normalized);
-      setCache((prev) => ({ ...prev, [key]: normalized }));
-      savePromptToHistory(trimmedPrompt);
-      setSnackbar({ open: true, message: "Data generated successfully", severity: "success" });
-      setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
-    } catch (err) {
-      const message = err.response?.data?.detail || err.message || "Error generating data";
-      setSnackbar({ open: true, message, severity: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownload = () => {
-    if (!dataset || dataset.format !== format) return;
-    const blob = new Blob(
-      [
-        dataset.format === "json"
-          ? JSON.stringify(dataset.raw, null, 2)
-          : dataset.raw,
-      ],
-      { type: dataset.format === "json" ? "application/json" : "text/csv" }
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `synthetic_data.${dataset.format}`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleCopyToClipboard = async () => {
-    if (!dataset) return;
-    const text =
-      dataset.format === "json"
-        ? JSON.stringify(dataset.raw, null, 2)
-        : dataset.raw;
-    try {
-      await navigator.clipboard.writeText(text);
-      setSnackbar({ open: true, message: "Copied to clipboard", severity: "success" });
-    } catch {
-      setSnackbar({ open: true, message: "Failed to copy", severity: "error" });
-    }
-  };
-
-  const handleRegenerate = async () => {
-    const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt) return;
-    const key = `${trimmedPrompt}__${format}__${rowCount}`;
-    setCache((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    setLoading(true);
-    try {
-      const res = await axios.post(`${API_BASE_URL}/generate-data`, {
-        prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
-        format,
-      }, { timeout: 30000 });
-      const normalized = normalizeDataset(res.data, format);
-      setDataset(normalized);
-      setCache((prev) => ({ ...prev, [key]: normalized }));
-      savePromptToHistory(trimmedPrompt);
-      setSnackbar({ open: true, message: "Data regenerated", severity: "success" });
-      setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
-    } catch (err) {
-      const message = err.response?.data?.detail || err.message || "Error generating data";
-      setSnackbar({ open: true, message, severity: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    dataset,
+    loading,
+    tableRef,
+    datasetSummary,
+    handleGenerate,
+    handleDownload,
+    handleCopyToClipboard,
+    handleRegenerate,
+  } = useDataGeneration({ format, rowCount, prompt, setSnackbar, savePromptToHistory });
 
   const handlePromptKeyDown = (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
       handleGenerate();
     }
-  };
-
-  const handleHistoryClick = (item) => {
-    setPrompt(item);
-  };
-
-  const handleDeletePrompt = () => {
-    const updated = history.filter(p => p !== promptToDelete);
-    setRecentlyDeleted(promptToDelete);
-    setHistory(updated);
-    localStorage.setItem("promptHistory", JSON.stringify(updated));
-    setSnackbar({ open: true, message: `Prompt "${promptToDelete}" deleted`, severity: "info" });
-    setDeleteDialogOpen(false);
-    setPromptToDelete(null);
-  };
-
-  const handleClearHistory = () => {
-    setHistory([]);
-    setRecentlyDeleted(null);
-    localStorage.removeItem("promptHistory");
-    setSnackbar({ open: true, message: "Prompt history cleared", severity: "info" });
-  };
-
-
-  const openDeleteDialog = (prompt) => {
-    setPromptToDelete(prompt);
-    setDeleteDialogOpen(true);
-  };
-
-  const closeDeleteDialog = () => {
-    setDeleteDialogOpen(false);
-    setPromptToDelete(null);
   };
 
   return (
@@ -296,7 +99,7 @@ function App() {
             variant="outlined"
             size="small"
             aria-label="Toggle theme"
-            onClick={() => setColorMode((prev) => (prev === "light" ? "dark" : "light"))}
+            onClick={toggleColorMode}
             startIcon={colorMode === "light" ? <AutoAwesomeIcon /> : <Brightness7Icon />}
             sx={{
               textTransform: "none",
@@ -324,166 +127,45 @@ function App() {
           <Stack spacing={3}>
             <Card elevation={2} sx={{ transition: "transform 150ms ease, box-shadow 150ms ease", "&:hover": { transform: "translateY(-2px)", boxShadow: 8 } }}>
               <CardContent>
-                <Stack spacing={2}>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
-                  <Select
-                    value={format}
-                    onChange={(e) => setFormat(e.target.value)}
-                    size="small"
-                    inputProps={{ "aria-label": "Output format" }}
-                    sx={{ width: 140, backgroundColor: "background.paper" }}
-                  >
-                    <MenuItem value="json">JSON</MenuItem>
-                    <MenuItem value="csv">CSV</MenuItem>
-                  </Select>
-                  <TextField
-                    type="number"
-                    label="Rows"
-                    size="small"
-                    value={rowCount}
-                    onChange={(e) => {
-                      const v = Math.max(1, Math.min(1000, Number(e.target.value) || 1));
-                      setRowCount(v);
-                    }}
-                    inputProps={{ min: 1, max: 1000, "aria-label": "Number of rows" }}
-                    sx={{ width: 100, backgroundColor: "background.paper" }}
-                  />
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <Button
-                      variant="contained"
-                      startIcon={<RocketLaunchIcon />}
-                      onClick={handleGenerate}
-                      disabled={loading}
-                      aria-label="Generate data"
-                      sx={{
-                        textTransform: "none",
-                        px: 2.5,
-                        boxShadow: "0 10px 30px rgba(255,107,107,0.25)",
-                        "&:hover": { transform: "translateY(-1px) scale(1.01)" },
-                      }}
-                    >
-                      Generate
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={handleDownload}
-                      disabled={!dataset || dataset.format !== format}
-                      startIcon={<DownloadIcon />}
-                      aria-label={`Download ${format.toUpperCase()}`}
-                      sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
-                    >
-                      Download {format.toUpperCase()}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={handleCopyToClipboard}
-                      disabled={!dataset}
-                      startIcon={<ContentCopyIcon />}
-                      aria-label="Copy to clipboard"
-                      sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
-                    >
-                      Copy
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={handleRegenerate}
-                      disabled={loading || !prompt.trim()}
-                      startIcon={<RefreshIcon />}
-                      aria-label="Re-generate data"
-                      sx={{ textTransform: "none", px: 2.5, "&:hover": { transform: "translateY(-1px) scale(1.01)" } }}
-                    >
-                      Re-generate
-                    </Button>
-                    <Button
-                      variant="text"
-                      startIcon={<ShuffleIcon />}
-                      aria-label="Random prompt"
-                      onClick={() => {
+                <PromptForm
+                  prompt={prompt}
+                  setPrompt={setPrompt}
+                  format={format}
+                  setFormat={setFormat}
+                  rowCount={rowCount}
+                  setRowCount={setRowCount}
+                  datasetSummary={datasetSummary}
+                  onKeyDown={handlePromptKeyDown}
+                  actionBar={
+                    <ActionBar
+                      loading={loading}
+                      dataset={dataset}
+                      format={format}
+                      prompt={prompt}
+                      onGenerate={handleGenerate}
+                      onDownload={handleDownload}
+                      onCopy={handleCopyToClipboard}
+                      onRegenerate={handleRegenerate}
+                      onRandomPrompt={() => {
                         const randomPrompt = SAMPLE_PROMPTS[Math.floor(Math.random() * SAMPLE_PROMPTS.length)];
                         setPrompt(randomPrompt);
                       }}
-                      sx={{ textTransform: "none" }}
-                    >
-                      Random prompt
-                    </Button>
-                  </Stack>
-                </Stack>
-
-                  <TextField
-                    label="Prompt"
-                    multiline
-                    fullWidth
-                    minRows={4}
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={handlePromptKeyDown}
-                    placeholder="e.g. Generate 20 sample users with name, email, and signup date"
-                    helperText="Press Ctrl+Enter / Cmd+Enter to generate"
-                  />
-
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {SAMPLE_PROMPTS.map((example) => (
-                      <Chip
-                        key={example}
-                        label={example}
-                        size="small"
-                        variant={prompt === example ? "filled" : "outlined"}
-                        onClick={() => setPrompt(example)}
-                        icon={<CelebrationIcon fontSize="small" />}
-                        sx={{
-                          borderRadius: 2,
-                          "&:hover": { transform: "translateY(-1px) scale(1.01)" },
-                        }}
-                      />
-                    ))}
-                  </Stack>
-
-                  {datasetSummary && (
-                    <Grow in timeout={200}>
-                      <Alert severity="info" icon={<CelebrationIcon fontSize="small" />}>
-                        {datasetSummary.rows} rows · {datasetSummary.columns} columns · {datasetSummary.format.toUpperCase()}
-                      </Alert>
-                    </Grow>
-                  )}
-                </Stack>
+                    />
+                  }
+                />
               </CardContent>
             </Card>
 
-            <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems="stretch">
-              <Card sx={{ flex: 1, transition: "transform 150ms ease, box-shadow 150ms ease", "&:hover": { transform: "translateY(-2px)", boxShadow: 8 } }}>
-                <CardContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6">Prompt History</Typography>
-                    <Button size="small" onClick={handleClearHistory} disabled={history.length === 0} startIcon={<HistoryIcon />} aria-label="Clear history">
-                      Clear History
-                    </Button>
-                  </Stack>
-                  <Divider />
-                  {history.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">No prompts yet. Generate something to save it.</Typography>
-                  ) : (
-                    <Stack spacing={1.5}>
-                      {history.map((item, idx) => (
-                        <Stack
-                          key={idx}
-                          direction="row"
-                          alignItems="center"
-                          justifyContent="space-between"
-                          spacing={1}
-                        >
-                          <Button variant="text" onClick={() => handleHistoryClick(item)} aria-label={`Use prompt: ${item}`} sx={{ textAlign: "left" }}>
-                            {item}
-                          </Button>
-                          <IconButton color="error" onClick={() => openDeleteDialog(item)} size="small" aria-label={`Delete prompt: ${item}`}>
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Stack>
-                      ))}
-                    </Stack>
-                  )}
-                </CardContent>
-              </Card>
-            </Stack>
+            <HistoryPanel
+              history={history}
+              deleteDialogOpen={deleteDialogOpen}
+              promptToDelete={promptToDelete}
+              onHistoryClick={(item) => setPrompt(item)}
+              onDeletePrompt={handleDeletePrompt}
+              onClearHistory={handleClearHistory}
+              onOpenDeleteDialog={openDeleteDialog}
+              onCloseDeleteDialog={closeDeleteDialog}
+            />
 
             {loading && (
               <Card>
@@ -530,17 +212,7 @@ function App() {
               <Button
                 color="inherit"
                 size="small"
-                onClick={() => {
-                  const restored = [recentlyDeleted, ...history];
-                  setHistory(restored);
-                  localStorage.setItem("promptHistory", JSON.stringify(restored));
-                  setSnackbar({
-                    open: true,
-                    message: `Prompt "${recentlyDeleted}" restored`,
-                    severity: "success",
-                  });
-                  setRecentlyDeleted(null);
-                }}
+                onClick={restoreDeleted}
               >
                 UNDO
               </Button>
@@ -552,19 +224,6 @@ function App() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-
-      <Dialog open={deleteDialogOpen} onClose={closeDeleteDialog}>
-        <DialogTitle>Delete Prompt</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete the prompt "{promptToDelete}" from history?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDeleteDialog}>Cancel</Button>
-          <Button color="error" onClick={handleDeletePrompt}>Delete</Button>
-        </DialogActions>
-      </Dialog>
     </ThemeProvider>
   );
 }
