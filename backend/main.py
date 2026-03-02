@@ -6,7 +6,14 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from openai import AsyncOpenAI, Timeout
+from openai import (
+    AsyncOpenAI,
+    Timeout,
+    APIStatusError,
+    APITimeoutError,
+    APIConnectionError,
+)
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 from typing import List, Literal
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -33,7 +40,7 @@ if settings.sentry_dsn:
 
 client = AsyncOpenAI(
     api_key=settings.openai_api_key,
-    timeout=Timeout(timeout=30.0),
+    timeout=Timeout(timeout=25.0),
 )
 
 _response_cache = TTLCache(maxsize=256, ttl=600)  # 10-min TTL
@@ -192,6 +199,20 @@ async def generate_data(request: Request, data_request: DataRequest):
 # ---------------------------------------------------------------------------
 # OpenAI helpers
 # ---------------------------------------------------------------------------
+def _is_retryable(exc):
+    if isinstance(exc, (APITimeoutError, APIConnectionError)):
+        return True
+    if isinstance(exc, APIStatusError) and exc.status_code >= 500:
+        return True
+    return False
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception(_is_retryable),
+    reraise=True,
+)
 async def request_dataset_from_openai(
     prompt: str,
 ) -> str:

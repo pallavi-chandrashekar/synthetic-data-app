@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef } from "react";
 import axios from "axios";
 import Papa from "papaparse";
+import * as Sentry from "@sentry/react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -63,7 +64,7 @@ export default function useDataGeneration({ format, rowCount, prompt, setSnackba
       const res = await axios.post(`${API_BASE_URL}/generate-data`, {
         prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
         format,
-      }, { timeout: 30000 });
+      }, { timeout: 35000 });
       const normalized = normalizeDataset(res.data, format);
       setDataset(normalized);
       setCache((prev) => ({ ...prev, [key]: normalized }));
@@ -71,6 +72,7 @@ export default function useDataGeneration({ format, rowCount, prompt, setSnackba
       setSnackbar({ open: true, message: "Data generated successfully", severity: "success" });
       setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
     } catch (err) {
+      Sentry.captureException(err);
       const message = err.response?.data?.detail || err.message || "Error generating data";
       setSnackbar({ open: true, message, severity: "error" });
     } finally {
@@ -124,7 +126,7 @@ export default function useDataGeneration({ format, rowCount, prompt, setSnackba
       const res = await axios.post(`${API_BASE_URL}/generate-data`, {
         prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
         format,
-      }, { timeout: 30000 });
+      }, { timeout: 35000 });
       const normalized = normalizeDataset(res.data, format);
       setDataset(normalized);
       setCache((prev) => ({ ...prev, [key]: normalized }));
@@ -132,6 +134,7 @@ export default function useDataGeneration({ format, rowCount, prompt, setSnackba
       setSnackbar({ open: true, message: "Data regenerated", severity: "success" });
       setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
     } catch (err) {
+      Sentry.captureException(err);
       const message = err.response?.data?.detail || err.message || "Error generating data";
       setSnackbar({ open: true, message, severity: "error" });
     } finally {

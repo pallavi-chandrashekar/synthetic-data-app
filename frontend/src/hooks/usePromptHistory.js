@@ -1,5 +1,18 @@
 import { useState } from "react";
 
+const safePersist = (data) => {
+  try {
+    localStorage.setItem("promptHistory", JSON.stringify(data));
+  } catch {
+    const trimmed = data.slice(0, 5);
+    try {
+      localStorage.setItem("promptHistory", JSON.stringify(trimmed));
+    } catch {
+      localStorage.removeItem("promptHistory");
+    }
+  }
+};
+
 export default function usePromptHistory(setSnackbar) {
   const [history, setHistory] = useState(() => {
     const saved = localStorage.getItem("promptHistory");
@@ -13,7 +26,7 @@ export default function usePromptHistory(setSnackbar) {
     if (!history.includes(prompt)) {
       const newHistory = [prompt, ...history.slice(0, 9)];
       setHistory(newHistory);
-      localStorage.setItem("promptHistory", JSON.stringify(newHistory));
+      safePersist(newHistory);
     }
   };
 
@@ -23,7 +36,7 @@ export default function usePromptHistory(setSnackbar) {
     const updated = history.filter((p) => p !== promptToDelete);
     setRecentlyDeleted(promptToDelete);
     setHistory(updated);
-    localStorage.setItem("promptHistory", JSON.stringify(updated));
+    safePersist(updated);
     setSnackbar({ open: true, message: `Prompt "${promptToDelete}" deleted`, severity: "info" });
     setDeleteDialogOpen(false);
     setPromptToDelete(null);
@@ -49,7 +62,7 @@ export default function usePromptHistory(setSnackbar) {
   const restoreDeleted = () => {
     const restored = [recentlyDeleted, ...history];
     setHistory(restored);
-    localStorage.setItem("promptHistory", JSON.stringify(restored));
+    safePersist(restored);
     setSnackbar({
       open: true,
       message: `Prompt "${recentlyDeleted}" restored`,
