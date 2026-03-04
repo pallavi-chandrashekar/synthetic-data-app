@@ -28,7 +28,7 @@
     "papaparse": "^5.4.1",
     "@sentry/react": "^9.5.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
