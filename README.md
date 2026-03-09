@@ -3,7 +3,7 @@
 ![CI](https://github.com/pallavi-chandrashekar/synthetic-data-app/actions/workflows/ci.yml/badge.svg?branch=main)
 ![License](https://img.shields.io/github/license/pallavi-chandrashekar/synthetic-data-app)
 
-A production-grade full-stack application that generates structured synthetic datasets from natural language prompts using OpenAI. Built with **FastAPI**, **React**, and **Material UI**, featuring server-side caching, retry logic with exponential backoff, Sentry observability, rate limiting, and a comprehensive CI/CD pipeline with 90%+ test coverage.
+A production-grade full-stack application that generates structured synthetic datasets from natural language prompts using **OpenAI**, **Anthropic Claude**, or **Google Gemini**. Built with **FastAPI**, **React**, and **Material UI**, featuring Bring-Your-Own-Key (BYOK) support, server-side caching, retry logic with exponential backoff, Sentry observability, rate limiting, and a comprehensive CI/CD pipeline with 90%+ test coverage.
 
 https://github.com/user-attachments/assets/3580e31e-9b7a-4b60-9081-b2c7f358df70
 
@@ -11,10 +11,11 @@ https://github.com/user-attachments/assets/3580e31e-9b7a-4b60-9081-b2c7f358df70
 
 ## Highlights
 
-- **AI-powered data generation** &mdash; Converts natural language prompts into structured tabular datasets using OpenAI structured output with enforced JSON schemas
-- **Production-hardened backend** &mdash; Retry with exponential backoff (tenacity), server-side TTL caching, rate limiting, input validation, and structured JSON logging
+- **Multi-provider AI** &mdash; Supports OpenAI, Anthropic Claude, and Google Gemini with provider selection dropdown and structured output/JSON schema enforcement
+- **Bring Your Own Key (BYOK)** &mdash; Users can supply their own API keys via a Settings dialog; keys are stored in localStorage and sent as HTTP headers, overriding server defaults
+- **Production-hardened backend** &mdash; Retry with exponential backoff (tenacity), server-side TTL caching (bypassed for user-key requests), rate limiting, input validation, and structured JSON logging
 - **Observability** &mdash; Sentry integration on both frontend and backend for error tracking; deep health check endpoint for container orchestration
-- **Comprehensive testing** &mdash; 16 backend unit tests (83% coverage), 17 frontend unit tests (80% coverage), 16 E2E scenarios (Playwright), enforced coverage thresholds in CI
+- **Comprehensive testing** &mdash; 19 backend unit tests, 19 frontend unit tests, 19 E2E scenarios (Playwright), enforced coverage thresholds in CI
 - **Containerized deployment** &mdash; Docker Compose with health checks, resource limits, isolated networking, and multi-worker Gunicorn
 
 ---
@@ -24,8 +25,8 @@ https://github.com/user-attachments/assets/3580e31e-9b7a-4b60-9081-b2c7f358df70
 | Layer          | Technology                                              |
 |----------------|---------------------------------------------------------|
 | **Frontend**   | React 18, Vite, Material UI 5, MUI DataGrid            |
-| **Backend**    | FastAPI, Pydantic, AsyncOpenAI (structured output)      |
-| **Resilience** | tenacity (retry/backoff), cachetools (TTL cache), slowapi (rate limiting) |
+| **Backend**    | FastAPI, Pydantic, AsyncOpenAI, AsyncAnthropic, Google GenAI |
+| **Resilience** | tenacity (retry/backoff per provider), cachetools (TTL cache), slowapi (rate limiting) |
 | **Observability** | Sentry SDK (frontend + backend), python-json-logger (structured logging) |
 | **Testing**    | pytest + pytest-cov, Vitest + v8 coverage, Playwright (E2E) |
 | **CI/CD**      | GitHub Actions (lint, security scan, tests, Docker build, E2E) |
@@ -38,16 +39,17 @@ https://github.com/user-attachments/assets/3580e31e-9b7a-4b60-9081-b2c7f358df70
 ```
                   +-----------+       +-------------------+       +-----------+
   User  ───────>  |  React    | ────> |  FastAPI           | ────> |  OpenAI   |
-                  |  (Vite)   | <──── |  + Retry/Cache     | <──── |  API      |
-                  +-----------+       +-------------------+       +-----------+
-                        |                      |
+                  |  (Vite)   | <──── |  + Retry/Cache     | <──── |  Anthropic|
+                  +-----------+       +-------------------+       |  Google   |
+                        |                      |                  +-----------+
                    Sentry SDK            Sentry SDK
                    localStorage          Structured Logs
+                   API Keys (BYOK)       Provider Registry
 ```
 
-**Backend** (`backend/main.py`) &mdash; FastAPI with Pydantic validation, server-side SHA256 response cache (TTL 10 min), tenacity retry decorator (3 attempts, exponential backoff on 5xx/timeout), rate limiting (10 req/min per IP), and structured JSON logging.
+**Backend** (`backend/main.py`, `backend/providers.py`) &mdash; FastAPI with Pydantic validation, multi-provider LLM abstraction (OpenAI, Anthropic, Google), server-side SHA256 response cache (TTL 10 min, bypassed for user-key requests), tenacity retry decorator (3 attempts, exponential backoff on 5xx/timeout per provider), rate limiting (10 req/min per IP), BYOK header resolution, and structured JSON logging.
 
-**Frontend** (`frontend/src/`) &mdash; React 18 with custom hooks architecture (`useDataGeneration`, `usePromptHistory`, `useThemeMode`), component composition via slot pattern, client-side caching, localStorage with quota-safe persistence, and Sentry error capture.
+**Frontend** (`frontend/src/`) &mdash; React 18 with custom hooks architecture (`useDataGeneration`, `usePromptHistory`, `useThemeMode`, `useApiKeys`), Settings dialog for BYOK, component composition via slot pattern, client-side caching, localStorage with quota-safe persistence, and Sentry error capture.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design document.
 
@@ -57,13 +59,15 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design document.
 
 | Category | Details |
 |----------|---------|
-| **Data Generation** | Natural language to structured dataset via OpenAI; JSON and CSV formats; configurable row count |
+| **Data Generation** | Natural language to structured dataset via OpenAI, Anthropic, or Google; JSON and CSV formats; configurable row count |
+| **Multi-Provider** | Provider selection dropdown; server-configured and/or user-supplied keys; automatic provider discovery |
+| **BYOK (Bring Your Own Key)** | Settings dialog with password fields for OpenAI, Anthropic, and Google API keys; show/hide toggle; keys persisted in localStorage; sent via HTTP headers |
 | **Data Preview** | MUI DataGrid with per-column filtering (contains, starts with, regex), sorting, pagination |
 | **Export** | One-click download (JSON/CSV), copy to clipboard |
 | **UX** | Sample prompt chips, random prompt, dataset summary badge, dark/light mode, loading states |
 | **History** | Prompt history (localStorage) with restore, delete with undo, clear all |
-| **Reliability** | Server-side caching, client-side caching, retry with exponential backoff, localStorage quota handling |
-| **Security** | Input validation (Pydantic), rate limiting, CORS, Bandit security scans, npm audit, `.env` not in git history |
+| **Reliability** | Server-side caching (bypassed for user keys), client-side caching, retry with exponential backoff, localStorage quota handling |
+| **Security** | Input validation (Pydantic), rate limiting, CORS with API key headers, Bandit security scans, npm audit, user keys sent via headers (not logged) |
 | **Observability** | Sentry on frontend + backend, structured JSON logs, deep health check (`/health?deep=true`) |
 | **Error Handling** | React Error Boundary, graceful API error display, Sentry exception capture |
 
@@ -74,28 +78,33 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design document.
 ```
 synthetic-data-app/
 ├── backend/
-│   ├── main.py                  # FastAPI app: routes, OpenAI integration, caching, retry logic
-│   ├── config.py                # pydantic-settings for environment validation
+│   ├── main.py                  # FastAPI app: routes, provider resolution, caching, BYOK headers
+│   ├── providers.py             # LLM provider abstraction (OpenAI, Anthropic, Google) with retry
+│   ├── config.py                # pydantic-settings for environment validation (warns if no keys)
 │   ├── conftest.py              # pytest fixtures
-│   ├── test_main.py             # 16 unit tests (83% coverage)
+│   ├── test_main.py             # 19 unit tests
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env.example
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx              # Root component with theme, layout, snackbar
+│   │   ├── App.jsx              # Root component with theme, settings, layout, snackbar
 │   │   ├── DataTable.jsx        # MUI DataGrid with per-column filtering
 │   │   ├── ErrorBoundary.jsx    # React error boundary
 │   │   ├── components/
 │   │   │   ├── PromptForm.jsx   # Prompt input with slot-based action bar
 │   │   │   ├── ActionBar.jsx    # Generate, download, copy, regenerate controls
-│   │   │   └── HistoryPanel.jsx # Prompt history sidebar
+│   │   │   ├── HistoryPanel.jsx # Prompt history sidebar
+│   │   │   └── SettingsDialog.jsx # BYOK API key settings dialog
 │   │   ├── hooks/
-│   │   │   ├── useDataGeneration.js  # API calls, caching, Sentry capture
-│   │   │   ├── usePromptHistory.js   # localStorage with quota-safe persistence
+│   │   │   ├── useDataGeneration.js  # API calls, caching, headers, Sentry capture
+│   │   │   ├── usePromptHistory.js   # localStorage with shared storage utility
+│   │   │   ├── useApiKeys.js         # API key state, persistence, header generation
 │   │   │   └── useThemeMode.js       # Dark/light mode toggle
-│   │   └── *.test.jsx           # 17 unit tests (80% coverage)
-│   ├── e2e/                     # 16 Playwright E2E scenarios
+│   │   ├── utils/
+│   │   │   └── storage.js       # Shared safePersist/safeRead localStorage utility
+│   │   └── *.test.jsx           # 19 unit tests
+│   ├── e2e/                     # 19 Playwright E2E scenarios
 │   ├── playwright.config.js
 │   ├── vitest.config.coverage.js
 │   ├── Dockerfile
@@ -118,7 +127,7 @@ synthetic-data-app/
 
 - Python 3.11+
 - Node.js 20+
-- An [OpenAI API key](https://platform.openai.com/api-keys)
+- At least one LLM API key: [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://console.anthropic.com/), or [Google AI](https://aistudio.google.com/apikey)
 
 ### 1. Clone the repo
 
@@ -131,12 +140,14 @@ cd synthetic-data-app
 
 ```bash
 cd backend
-cp .env.example .env        # Add your OPENAI_API_KEY
+cp .env.example .env        # Add your API key(s) — or leave empty for BYOK-only mode
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
+
+> **BYOK-only mode:** The backend starts successfully with zero server-side keys. Users must provide their own keys via the Settings dialog in the frontend.
 
 ### 3. Frontend
 
@@ -148,10 +159,12 @@ npm run dev
 
 Visit [http://localhost:3000](http://localhost:3000)
 
+To use BYOK: click **Settings** in the top bar, enter your API key(s), and close the dialog. The provider dropdown updates automatically.
+
 ### Docker (alternative)
 
 ```bash
-# Set OPENAI_API_KEY in backend/.env first
+# Optionally set API keys in backend/.env (not required for BYOK mode)
 docker compose up --build
 ```
 
@@ -161,13 +174,36 @@ Starts backend (port 8000) and frontend (port 3000) with health checks, resource
 
 ## API Reference
 
+### `GET /providers`
+
+Returns the list of available LLM providers. Accepts optional user API key headers to include user-provisioned providers.
+
+**Headers (optional):**
+
+| Header | Description |
+|--------|-------------|
+| `X-OpenAI-API-Key` | User's OpenAI API key |
+| `X-Anthropic-API-Key` | User's Anthropic API key |
+| `X-Google-API-Key` | User's Google API key |
+
+```bash
+curl http://localhost:8000/providers
+```
+
+```json
+{
+  "providers": ["openai", "anthropic"],
+  "default": "openai"
+}
+```
+
 ### `GET /health`
 
 Health check with optional deep probe.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `deep` | bool | `false` | When `true`, verifies OpenAI API connectivity |
+| `deep` | bool | `false` | When `true`, verifies provider API connectivity |
 
 ```bash
 curl http://localhost:8000/health?deep=true
@@ -177,7 +213,7 @@ curl http://localhost:8000/health?deep=true
 {
   "status": "healthy",
   "checks": {
-    "api_key_configured": "pass",
+    "any_provider_configured": "pass",
     "openai_reachable": "pass"
   }
 }
@@ -187,11 +223,14 @@ curl http://localhost:8000/health?deep=true
 
 Generate synthetic data from a natural language prompt. Rate limited to **10 req/min per IP**.
 
+Accepts the same user API key headers as `/providers`. When a user key is provided, it overrides the server-configured provider and **bypasses the server-side cache** (prevents cross-user data leakage).
+
 **Request:**
 ```json
 {
   "prompt": "Generate 10 users with name, email, and country",
-  "format": "json"
+  "format": "json",
+  "provider": "openai"
 }
 ```
 
@@ -215,9 +254,10 @@ Generate synthetic data from a natural language prompt. Rate limited to **10 req
 | Status | Meaning |
 |--------|---------|
 | `200` | Success |
+| `400` | Invalid or unconfigured provider |
 | `422` | Validation error (empty/too-long prompt, invalid format) |
 | `429` | Rate limit exceeded |
-| `502` | OpenAI error or malformed response |
+| `502` | Provider error or malformed response |
 
 ---
 
@@ -227,11 +267,17 @@ Generate synthetic data from a natural language prompt. Rate limited to **10 req
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `OPENAI_API_KEY` | Yes | &mdash; | OpenAI API key |
-| `OPENAI_MODEL` | No | `gpt-4.1` | Model for data generation |
+| `OPENAI_API_KEY` | No* | &mdash; | OpenAI API key |
+| `OPENAI_MODEL` | No | `gpt-4.1` | OpenAI model for data generation |
+| `ANTHROPIC_API_KEY` | No* | &mdash; | Anthropic API key |
+| `ANTHROPIC_MODEL` | No | `claude-sonnet-4-20250514` | Anthropic model |
+| `GOOGLE_API_KEY` | No* | &mdash; | Google AI API key |
+| `GOOGLE_MODEL` | No | `gemini-2.0-flash` | Google model |
 | `MAX_PROMPT_LENGTH` | No | `2000` | Max prompt character length |
 | `CORS_ORIGINS` | No | `http://localhost:3000` | Comma-separated allowed origins |
 | `SENTRY_DSN` | No | &mdash; | Sentry DSN for backend error tracking |
+
+*At least one server-side key is recommended; without any, users must provide their own keys via the frontend Settings dialog (BYOK mode).
 
 ### Frontend
 
@@ -251,7 +297,7 @@ cd backend
 pytest --cov=main --cov-report=term-missing --cov-fail-under=70
 ```
 
-**16 tests** covering: health endpoint (shallow + deep), JSON extraction (valid input, rows wrapper, extra text, array preference, deeply nested), error cases (invalid JSON, non-list, non-dict rows), generate endpoint (JSON + CSV formats), error propagation, and input validation.
+**19 tests** covering: health endpoint (shallow + deep), JSON extraction (valid input, rows wrapper, extra text, array preference, deeply nested), error cases (invalid JSON, non-list, non-dict rows), generate endpoint (JSON + CSV formats), error propagation, input validation, BYOK user key override, provider union with user keys, and cache bypass for user-key requests.
 
 ### Frontend
 
@@ -260,7 +306,7 @@ cd frontend
 npm run test:coverage
 ```
 
-**17 tests** covering: App rendering, format selector, prompt input, sample chips, prompt history, generate flow, API error handling, DataTable (empty/invalid/valid data), and ErrorBoundary (normal rendering + crash recovery).
+**19 tests** covering: App rendering, format selector, prompt input, sample chips, prompt history, generate flow, API error handling, Settings button rendering, Settings dialog interaction, DataTable (empty/invalid/valid data), and ErrorBoundary (normal rendering + crash recovery).
 
 ### E2E
 
@@ -269,7 +315,7 @@ cd frontend
 npx playwright test
 ```
 
-**16 Playwright scenarios** running against a live dev server in Chromium.
+**19 Playwright scenarios** running against a live dev server in Chromium: app load, dark mode toggle, Settings dialog, API key entry with visibility toggle, clear keys, sample prompt, JSON generation, copy to clipboard, JSON download, CSV switch + generation, CSV download, keyboard shortcut, prompt history, restore from history, delete history item, undo deletion, re-generate, clear history, and error handling.
 
 ### CI Pipeline
 

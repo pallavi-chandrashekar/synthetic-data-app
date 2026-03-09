@@ -1,32 +1,21 @@
 import { useState } from "react";
+import { safePersist, safeRead } from "../utils/storage";
 
-const safePersist = (data) => {
-  try {
-    localStorage.setItem("promptHistory", JSON.stringify(data));
-  } catch {
-    const trimmed = data.slice(0, 5);
-    try {
-      localStorage.setItem("promptHistory", JSON.stringify(trimmed));
-    } catch {
-      localStorage.removeItem("promptHistory");
-    }
-  }
-};
+const STORAGE_KEY = "promptHistory";
 
 export default function usePromptHistory(setSnackbar) {
-  const [history, setHistory] = useState(() => {
-    const saved = localStorage.getItem("promptHistory");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [history, setHistory] = useState(() => safeRead(STORAGE_KEY, []));
   const [recentlyDeleted, setRecentlyDeleted] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [promptToDelete, setPromptToDelete] = useState(null);
+
+  const persist = (data) => safePersist(STORAGE_KEY, data, data.slice(0, 5));
 
   const savePromptToHistory = (prompt) => {
     if (!history.includes(prompt)) {
       const newHistory = [prompt, ...history.slice(0, 9)];
       setHistory(newHistory);
-      safePersist(newHistory);
+      persist(newHistory);
     }
   };
 
@@ -36,7 +25,7 @@ export default function usePromptHistory(setSnackbar) {
     const updated = history.filter((p) => p !== promptToDelete);
     setRecentlyDeleted(promptToDelete);
     setHistory(updated);
-    safePersist(updated);
+    persist(updated);
     setSnackbar({ open: true, message: `Prompt "${promptToDelete}" deleted`, severity: "info" });
     setDeleteDialogOpen(false);
     setPromptToDelete(null);
@@ -45,7 +34,7 @@ export default function usePromptHistory(setSnackbar) {
   const handleClearHistory = () => {
     setHistory([]);
     setRecentlyDeleted(null);
-    localStorage.removeItem("promptHistory");
+    localStorage.removeItem(STORAGE_KEY);
     setSnackbar({ open: true, message: "Prompt history cleared", severity: "info" });
   };
 
@@ -62,7 +51,7 @@ export default function usePromptHistory(setSnackbar) {
   const restoreDeleted = () => {
     const restored = [recentlyDeleted, ...history];
     setHistory(restored);
-    safePersist(restored);
+    persist(restored);
     setSnackbar({
       open: true,
       message: `Prompt "${recentlyDeleted}" restored`,

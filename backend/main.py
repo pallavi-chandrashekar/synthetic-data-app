@@ -6,15 +6,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from openai import (
-    AsyncOpenAI,
-    Timeout,
-    APIStatusError,
-    APITimeoutError,
-    APIConnectionError,
-)
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
-from typing import List, Literal
+from typing import List, Literal, Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -25,6 +17,7 @@ from cachetools import TTLCache
 from pythonjsonlogger.json import JsonFormatter
 
 from config import Settings
+from providers import OpenAIProvider, AnthropicProvider, GoogleProvider, LLMProvider
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -38,16 +31,69 @@ if settings.sentry_dsn:
         send_default_pii=False,
     )
 
-client = AsyncOpenAI(
-    api_key=settings.openai_api_key,
-    timeout=Timeout(timeout=25.0),
+# Build provider registry
+_providers: dict[str, LLMProvider] = {}
+if settings.openai_api_key:
+    _providers["openai"] = OpenAIProvider(
+        settings.openai_api_key, settings.openai_model
+    )
+if settings.anthropic_api_key:
+    _providers["anthropic"] = AnthropicProvider(
+        settings.anthropic_api_key, settings.anthropic_model
+    )
+if settings.google_api_key:
+    _providers["google"] = GoogleProvider(
+        settings.google_api_key, settings.google_model
+    )
+
+_default_provider = (
+    settings.available_providers[0] if settings.available_providers else None
 )
 
 _response_cache = TTLCache(maxsize=256, ttl=600)  # 10-min TTL
 
+# Header-to-provider mapping for BYOK
+_HEADER_PROVIDER_MAP = {
+    "x-openai-api-key": ("openai", OpenAIProvider, settings.openai_model),
+    "x-anthropic-api-key": ("anthropic", AnthropicProvider, settings.anthropic_model),
+    "x-google-api-key": ("google", GoogleProvider, settings.google_model),
+}
 
-def _cache_key(prompt: str) -> str:
-    return hashlib.sha256(prompt.encode()).hexdigest()
+
+def _user_key_providers(request: Request) -> dict[str, LLMProvider]:
+    """Build ephemeral provider instances from user-supplied API key headers."""
+    user_providers: dict[str, LLMProvider] = {}
+    for header, (name, cls, model) in _HEADER_PROVIDER_MAP.items():
+        key = request.headers.get(header, "").strip()
+        if key:
+            user_providers[name] = cls(key, model)
+    return user_providers
+
+
+def _resolve_provider(
+    request: Request, provider_name: str | None
+) -> tuple[str, LLMProvider, bool]:
+    """Return (provider_name, provider_instance, is_user_key).
+
+    User-supplied headers override server defaults.
+    """
+    user_provs = _user_key_providers(request)
+    name = provider_name or (
+        list(user_provs.keys())[0] if user_provs else _default_provider
+    )
+    if name and name in user_provs:
+        return name, user_provs[name], True
+    if name and name in _providers:
+        return name, _providers[name], False
+    available = list({**_providers, **user_provs}.keys())
+    raise HTTPException(
+        status_code=400,
+        detail=f"Invalid or unconfigured provider: {name}. Available: {available}",
+    )
+
+
+def _cache_key(provider: str, prompt: str) -> str:
+    return hashlib.sha256(f"{provider}:{prompt}".encode()).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +123,12 @@ app.add_middleware(
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type"],
+    allow_headers=[
+        "Content-Type",
+        "X-OpenAI-API-Key",
+        "X-Anthropic-API-Key",
+        "X-Google-API-Key",
+    ],
 )
 
 
@@ -100,54 +151,48 @@ class DataRequest(BaseModel):
         description="Prompt describing the dataset to generate",
     )
     format: Literal["json", "csv"] = "json"
-
-
-DATASET_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "rows": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": {
-                    "anyOf": [
-                        {"type": "string"},
-                        {"type": "number"},
-                        {"type": "boolean"},
-                        {"type": "null"},
-                    ]
-                },
-            },
-        }
-    },
-    "required": ["rows"],
-    "additionalProperties": False,
-}
+    provider: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+@app.get("/providers")
+async def get_providers(request: Request):
+    user_provs = _user_key_providers(request)
+    all_providers = list(
+        dict.fromkeys(list(_providers.keys()) + list(user_provs.keys()))
+    )
+    default = _default_provider or (all_providers[0] if all_providers else None)
+    return {
+        "providers": all_providers,
+        "default": default,
+    }
+
+
 @app.get("/health")
 async def health(deep: bool = Query(False)):
     checks = {}
     healthy = True
 
-    # Check 1: API key configured (always runs)
-    api_key_set = bool(settings.openai_api_key)
-    checks["api_key_configured"] = "pass" if api_key_set else "fail"
-    if not api_key_set:
+    # Check 1: At least one provider configured
+    any_configured = len(_providers) > 0
+    checks["any_provider_configured"] = "pass" if any_configured else "fail"
+    if not any_configured:
         healthy = False
 
-    # Check 2: OpenAI reachable (only with ?deep=true)
+    # Check 2: Provider reachability (only with ?deep=true)
     if deep:
-        try:
-            await client.models.list()
-            checks["openai_reachable"] = "pass"
-        except Exception as exc:
-            logger.warning("Deep health check failed", extra={"error": str(exc)})
-            checks["openai_reachable"] = "fail"
-            healthy = False
+        for name, provider in _providers.items():
+            try:
+                await provider.health_check()
+                checks[f"{name}_reachable"] = "pass"
+            except Exception as exc:
+                logger.warning(
+                    "Deep health check failed for %s", name, extra={"error": str(exc)}
+                )
+                checks[f"{name}_reachable"] = "fail"
+                healthy = False
 
     status_code = 200 if healthy else 503
     return JSONResponse(
@@ -159,22 +204,33 @@ async def health(deep: bool = Query(False)):
 @app.post("/generate-data")
 @limiter.limit("10/minute")
 async def generate_data(request: Request, data_request: DataRequest):
+    # Resolve provider (user headers override server defaults)
+    provider_name, provider, is_user_key = _resolve_provider(
+        request, data_request.provider
+    )
+
     logger.info(
         "generate-data request received",
         extra={
             "prompt_prefix": data_request.prompt[:80],
             "format": data_request.format,
+            "provider": provider_name,
+            "user_key": is_user_key,
         },
     )
     try:
-        key = _cache_key(data_request.prompt)
-        cached = _response_cache.get(key)
-        if cached is not None:
-            logger.info("cache hit", extra={"cache_key": key[:12]})
-            content = cached
+        # Skip server-side cache when user key is used (avoids cross-user leakage)
+        if is_user_key:
+            content = await provider.generate(data_request.prompt)
         else:
-            content = await request_dataset_from_openai(data_request.prompt)
-            _response_cache[key] = content
+            key = _cache_key(provider_name, data_request.prompt)
+            cached = _response_cache.get(key)
+            if cached is not None:
+                logger.info("cache hit", extra={"cache_key": key[:12]})
+                content = cached
+            else:
+                content = await provider.generate(data_request.prompt)
+                _response_cache[key] = content
         data = extract_json(content)
 
         if data_request.format == "csv":
@@ -197,56 +253,8 @@ async def generate_data(request: Request, data_request: DataRequest):
 
 
 # ---------------------------------------------------------------------------
-# OpenAI helpers
+# JSON parsing helpers
 # ---------------------------------------------------------------------------
-def _is_retryable(exc):
-    if isinstance(exc, (APITimeoutError, APIConnectionError)):
-        return True
-    if isinstance(exc, APIStatusError) and exc.status_code >= 500:
-        return True
-    return False
-
-
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=8),
-    retry=retry_if_exception(_is_retryable),
-    reraise=True,
-)
-async def request_dataset_from_openai(
-    prompt: str,
-) -> str:
-    response = await client.responses.create(
-        model=settings.openai_model,
-        input=(
-            "You are a service that produces synthetic "
-            "tabular data. Always return a JSON object "
-            "that matches the provided schema and place "
-            "all rows within the `rows` array."
-            f"\n\nUser prompt: {prompt}"
-        ),
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "synthetic_dataset",
-                "schema": DATASET_SCHEMA,
-                "strict": True,
-            },
-        },
-        temperature=0.4,
-    )
-
-    try:
-        first_output = response.output[0]
-        first_content = first_output.content[0]
-        return first_content.text
-    except (AttributeError, IndexError) as exc:
-        raise HTTPException(
-            status_code=502,
-            detail="Malformed response from OpenAI",
-        ) from exc
-
-
 def _find_balanced(content: str, open_ch: str, close_ch: str):
     """Return the first balanced substring delimited by open_ch/close_ch, or None."""
     start = content.find(open_ch)

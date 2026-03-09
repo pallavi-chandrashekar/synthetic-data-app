@@ -67,9 +67,26 @@ async function hideOverlay(page) {
  * Synthetic Data Generator app. Route interception mocks all backend
  * calls so no real API key is required.
  */
-test("Video walkthrough — all 16 scenarios", async ({ page }) => {
+test("Video walkthrough — all 19 scenarios", async ({ page }) => {
   // ── Track how many /generate-data calls have been made ──
   let generateCallCount = 0;
+
+  // ── Route interception: mock GET /providers ──
+  await page.route("**/providers", async (route) => {
+    const req = route.request();
+    if (req.method() !== "GET") return route.continue();
+
+    const headers = req.headers();
+    const providers = ["openai"];
+    if (headers["x-anthropic-api-key"]) providers.push("anthropic");
+    if (headers["x-google-api-key"]) providers.push("google");
+
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ providers, default: "openai" }),
+    });
+  });
 
   // ── Route interception: mock POST /generate-data ──
   await page.route("**/generate-data", async (route) => {
@@ -161,9 +178,64 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 3 · Sample prompt chip
+  // 3 · Open Settings dialog
   // ─────────────────────────────────────────────
-  await showOverlay(page, 3, "Sample Prompt");
+  await showOverlay(page, 3, "Settings Dialog");
+  const settingsBtn = page.getByRole("button", { name: /Settings/ });
+  await settingsBtn.evaluate((el) => {
+    el.style.outline = "3px solid #ff6b6b";
+    el.style.outlineOffset = "4px";
+    el.style.transition = "outline 0.3s ease";
+  });
+  await page.waitForTimeout(800);
+  // Remove highlight before opening (dialog will cover the button)
+  await settingsBtn.evaluate((el) => {
+    el.style.outline = "none";
+  });
+  await settingsBtn.click();
+  await expect(page.getByText("API Key Settings")).toBeVisible();
+  await page.waitForTimeout(PAUSE);
+  await hideOverlay(page);
+
+  // ─────────────────────────────────────────────
+  // 4 · Enter API key + visibility toggle
+  // ─────────────────────────────────────────────
+  await showOverlay(page, 4, "Enter API Key");
+  const openaiField = page.getByLabel("OpenAI API Key");
+  await openaiField.click();
+  // Type a demo key character by character for visual effect
+  await openaiField.pressSequentially("sk-demo-1234567890abcdef", { delay: 60 });
+  await page.waitForTimeout(1000);
+  // Toggle visibility to reveal the key
+  const toggleVisBtn = page.getByRole("button", { name: /toggle openai key visibility/i });
+  await toggleVisBtn.click();
+  await page.waitForTimeout(1500);
+  // Toggle back to hide
+  await toggleVisBtn.click();
+  await page.waitForTimeout(1000);
+  await hideOverlay(page);
+
+  // ─────────────────────────────────────────────
+  // 5 · Clear all keys + close
+  // ─────────────────────────────────────────────
+  await showOverlay(page, 5, "Clear Keys & Close");
+  const clearKeysBtn = page.getByRole("button", { name: /Clear All Keys/i });
+  await clearKeysBtn.click();
+  await page.waitForTimeout(800);
+  // Verify the field is cleared
+  await expect(openaiField).toHaveValue("");
+  await page.waitForTimeout(800);
+  // Close the dialog
+  const doneBtn = page.getByRole("button", { name: /Done/i });
+  await doneBtn.click();
+  await expect(page.getByText("API Key Settings")).not.toBeVisible();
+  await page.waitForTimeout(PAUSE);
+  await hideOverlay(page);
+
+  // ─────────────────────────────────────────────
+  // 6 · Sample prompt chip
+  // ─────────────────────────────────────────────
+  await showOverlay(page, 6, "Sample Prompt");
   const firstChip = page.getByRole("button", {
     name: /Generate 50 fake customer profiles/,
   });
@@ -176,9 +248,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 4 · Generate JSON data
+  // 7 · Generate JSON data
   // ─────────────────────────────────────────────
-  await showOverlay(page, 4, "Generate JSON");
+  await showOverlay(page, 7, "Generate JSON");
   const generateBtn = page.getByRole("button", { name: /Generate/i }).first();
   await generateBtn.click();
   // Wait for spinner then table
@@ -190,9 +262,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 5 · Copy to clipboard
+  // 8 · Copy to clipboard
   // ─────────────────────────────────────────────
-  await showOverlay(page, 5, "Copy to Clipboard");
+  await showOverlay(page, 8, "Copy to Clipboard");
   // Grant clipboard permissions so the copy succeeds
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   const copyBtn = page.getByRole("button", { name: /Copy/ });
@@ -202,9 +274,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 6 · Download JSON
+  // 9 · Download JSON
   // ─────────────────────────────────────────────
-  await showOverlay(page, 6, "Download JSON");
+  await showOverlay(page, 9, "Download JSON");
   const [jsonDownload] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: /Download JSON/i }).click(),
@@ -214,9 +286,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 7 · Switch to CSV + generate
+  // 10 · Switch to CSV + generate
   // ─────────────────────────────────────────────
-  await showOverlay(page, 7, "Switch to CSV");
+  await showOverlay(page, 10, "Switch to CSV");
   // The format Select shows "JSON" text — target the specific combobox
   const formatSelect = page.getByText("JSON", { exact: true });
   await formatSelect.click();
@@ -229,9 +301,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 8 · Download CSV
+  // 11 · Download CSV
   // ─────────────────────────────────────────────
-  await showOverlay(page, 8, "Download CSV");
+  await showOverlay(page, 11, "Download CSV");
   const [csvDownload] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: /Download CSV/i }).click(),
@@ -241,9 +313,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 9 · Keyboard shortcut (Ctrl+Enter)
+  // 12 · Keyboard shortcut (Ctrl+Enter)
   // ─────────────────────────────────────────────
-  await showOverlay(page, 9, "Keyboard Shortcut");
+  await showOverlay(page, 12, "Keyboard Shortcut");
   // Switch back to JSON — the select now shows "CSV"
   await page.getByText("CSV", { exact: true }).first().click();
   await page.getByRole("option", { name: "JSON" }).click();
@@ -260,11 +332,11 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 10 · Prompt history
+  // 13 · Prompt history
   // ─────────────────────────────────────────────
   const historySection = page.getByText("Prompt History");
   await historySection.scrollIntoViewIfNeeded();
-  await showOverlay(page, 10, "Prompt History");
+  await showOverlay(page, 13, "Prompt History");
   await page.waitForTimeout(500);
   // We should have at least 2 history items by now
   // (customer profiles prompt + sales records prompt)
@@ -274,9 +346,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 11 · Restore from history
+  // 14 · Restore from history
   // ─────────────────────────────────────────────
-  await showOverlay(page, 11, "Restore Prompt");
+  await showOverlay(page, 14, "Restore Prompt");
   // Click the customer profiles history item to restore it
   const historyButton = page
     .getByRole("button", { name: /Generate 50 fake customer profiles/ })
@@ -289,9 +361,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 12 · Delete history item
+  // 15 · Delete history item
   // ─────────────────────────────────────────────
-  await showOverlay(page, 12, "Delete History Item");
+  await showOverlay(page, 15, "Delete History Item");
   // Each history row has a delete icon button — click the first one
   const deleteIcons = page.locator('[data-testid="DeleteIcon"]');
   await deleteIcons.first().click();
@@ -302,20 +374,20 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 13 · Undo deletion
+  // 16 · Undo deletion
   // ─────────────────────────────────────────────
   // Click UNDO immediately before the snackbar auto-dismisses
   const undoBtn = page.getByRole("button", { name: "UNDO" });
   await undoBtn.click();
-  await showOverlay(page, 13, "Undo Deletion");
+  await showOverlay(page, 16, "Undo Deletion");
   await expect(page.getByText(/restored/i)).toBeVisible();
   await page.waitForTimeout(PAUSE);
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 14 · Re-generate
+  // 17 · Re-generate
   // ─────────────────────────────────────────────
-  await showOverlay(page, 14, "Re-generate");
+  await showOverlay(page, 17, "Re-generate");
   // Make sure the prompt field has content
   await promptField.fill(
     "Generate 50 fake customer profiles with fields: name, email, age, country"
@@ -332,10 +404,10 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 15 · Clear history
+  // 18 · Clear history
   // ─────────────────────────────────────────────
   await historySection.scrollIntoViewIfNeeded();
-  await showOverlay(page, 15, "Clear History");
+  await showOverlay(page, 18, "Clear History");
   const clearBtn = page.getByRole("button", { name: /Clear History/i });
   await clearBtn.click();
   await expect(
@@ -345,9 +417,9 @@ test("Video walkthrough — all 16 scenarios", async ({ page }) => {
   await hideOverlay(page);
 
   // ─────────────────────────────────────────────
-  // 16 · Error scenario
+  // 19 · Error scenario
   // ─────────────────────────────────────────────
-  await showOverlay(page, 16, "Error Handling");
+  await showOverlay(page, 19, "Error Handling");
   await promptField.fill("FORCE_ERROR — trigger backend failure");
   await page.waitForTimeout(300);
   await generateBtn.click();

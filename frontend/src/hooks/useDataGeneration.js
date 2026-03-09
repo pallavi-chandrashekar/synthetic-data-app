@@ -25,7 +25,7 @@ const normalizeDataset = (payload, requestedFormat) => {
   return { format: "json", table: payload.json, raw: payload.json };
 };
 
-export default function useDataGeneration({ format, rowCount, prompt, setSnackbar, savePromptToHistory }) {
+export default function useDataGeneration({ format, rowCount, prompt, provider, setSnackbar, savePromptToHistory, getHeaders }) {
   const [dataset, setDataset] = useState(null);
   const [loading, setLoading] = useState(false);
   const [cache, setCache] = useState({});
@@ -48,7 +48,7 @@ export default function useDataGeneration({ format, rowCount, prompt, setSnackba
 
   const handleGenerate = async () => {
     const trimmedPrompt = prompt.trim();
-    const key = `${trimmedPrompt}__${format}__${rowCount}`;
+    const key = `${provider}__${trimmedPrompt}__${format}__${rowCount}`;
 
     if (!trimmedPrompt) return;
 
@@ -61,10 +61,13 @@ export default function useDataGeneration({ format, rowCount, prompt, setSnackba
 
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}/generate-data`, {
+      const body = {
         prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
         format,
-      }, { timeout: 35000 });
+      };
+      if (provider) body.provider = provider;
+      const headers = getHeaders ? getHeaders() : {};
+      const res = await axios.post(`${API_BASE_URL}/generate-data`, body, { timeout: 35000, headers });
       const normalized = normalizeDataset(res.data, format);
       setDataset(normalized);
       setCache((prev) => ({ ...prev, [key]: normalized }));
@@ -115,7 +118,7 @@ export default function useDataGeneration({ format, rowCount, prompt, setSnackba
   const handleRegenerate = async () => {
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) return;
-    const key = `${trimmedPrompt}__${format}__${rowCount}`;
+    const key = `${provider}__${trimmedPrompt}__${format}__${rowCount}`;
     setCache((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -123,10 +126,13 @@ export default function useDataGeneration({ format, rowCount, prompt, setSnackba
     });
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}/generate-data`, {
+      const body = {
         prompt: `${trimmedPrompt}\n\nGenerate exactly ${rowCount} rows.`,
         format,
-      }, { timeout: 35000 });
+      };
+      if (provider) body.provider = provider;
+      const headers = getHeaders ? getHeaders() : {};
+      const res = await axios.post(`${API_BASE_URL}/generate-data`, body, { timeout: 35000, headers });
       const normalized = normalizeDataset(res.data, format);
       setDataset(normalized);
       setCache((prev) => ({ ...prev, [key]: normalized }));

@@ -8,7 +8,12 @@ vi.mock('axios');
 describe('App', () => {
   beforeEach(() => {
     localStorage.removeItem('promptHistory');
+    localStorage.removeItem('apiKeys');
     vi.restoreAllMocks();
+    // Mock GET /providers
+    axios.get = vi.fn().mockResolvedValue({
+      data: { providers: ['openai'], default: 'openai' },
+    });
   });
 
   it('renders the main heading', () => {
@@ -99,6 +104,20 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getByText('history test')).toBeInTheDocument();
+    });
+  });
+
+  it('renders settings button in AppBar', () => {
+    render(<App />);
+    expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument();
+  });
+
+  it('opens settings dialog when settings button is clicked', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('API Key Settings')).toBeInTheDocument();
     });
   });
 });

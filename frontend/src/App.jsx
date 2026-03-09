@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Alert,
   AppBar,
@@ -15,15 +15,21 @@ import {
   Typography,
 } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
+import axios from "axios";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
+import SettingsIcon from "@mui/icons-material/Settings";
 import DataTable from "./DataTable";
 import useThemeMode from "./hooks/useThemeMode";
 import usePromptHistory from "./hooks/usePromptHistory";
 import useDataGeneration from "./hooks/useDataGeneration";
+import useApiKeys from "./hooks/useApiKeys";
 import PromptForm from "./components/PromptForm";
 import ActionBar from "./components/ActionBar";
 import HistoryPanel from "./components/HistoryPanel";
+import SettingsDialog from "./components/SettingsDialog";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const SAMPLE_PROMPTS = [
   "Generate 50 fake customer profiles with fields: name, email, age, country",
@@ -37,6 +43,22 @@ function App() {
   const [format, setFormat] = useState("json");
   const [rowCount, setRowCount] = useState(10);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [provider, setProvider] = useState("");
+  const [availableProviders, setAvailableProviders] = useState([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const { apiKeys, updateKey, clearKeys, getHeaders } = useApiKeys();
+
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/providers`, { headers: getHeaders() })
+      .then((res) => {
+        setAvailableProviders(res.data.providers || []);
+        setProvider(res.data.default || "");
+      })
+      .catch(() => {
+        // Fallback: assume single provider, don't show dropdown
+      });
+  }, [apiKeys]);
 
   const { colorMode, theme, toggleColorMode } = useThemeMode();
 
@@ -62,7 +84,7 @@ function App() {
     handleDownload,
     handleCopyToClipboard,
     handleRegenerate,
-  } = useDataGeneration({ format, rowCount, prompt, setSnackbar, savePromptToHistory });
+  } = useDataGeneration({ format, rowCount, prompt, provider, setSnackbar, savePromptToHistory, getHeaders });
 
   const handlePromptKeyDown = (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -95,21 +117,38 @@ function App() {
               Prompt → preview → filter → download
             </Typography>
           </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            aria-label="Toggle theme"
-            onClick={toggleColorMode}
-            startIcon={colorMode === "light" ? <AutoAwesomeIcon /> : <Brightness7Icon />}
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              px: 2,
-              fontWeight: 600,
-            }}
-          >
-            {colorMode === "light" ? "Dark Mode" : "Light Mode"}
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              variant="outlined"
+              size="small"
+              aria-label="Settings"
+              onClick={() => setSettingsOpen(true)}
+              startIcon={<SettingsIcon />}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 2,
+                fontWeight: 600,
+              }}
+            >
+              Settings
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              aria-label="Toggle theme"
+              onClick={toggleColorMode}
+              startIcon={colorMode === "light" ? <AutoAwesomeIcon /> : <Brightness7Icon />}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 2,
+                fontWeight: 600,
+              }}
+            >
+              {colorMode === "light" ? "Dark Mode" : "Light Mode"}
+            </Button>
+          </Stack>
         </Toolbar>
       </AppBar>
 
@@ -134,6 +173,9 @@ function App() {
                   setFormat={setFormat}
                   rowCount={rowCount}
                   setRowCount={setRowCount}
+                  provider={provider}
+                  setProvider={setProvider}
+                  availableProviders={availableProviders}
                   datasetSummary={datasetSummary}
                   onKeyDown={handlePromptKeyDown}
                   actionBar={
@@ -224,6 +266,14 @@ function App() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        apiKeys={apiKeys}
+        updateKey={updateKey}
+        clearKeys={clearKeys}
+      />
     </ThemeProvider>
   );
 }

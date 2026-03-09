@@ -10,10 +10,31 @@ import {
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import { SAMPLE_PROMPTS } from "../App";
 
-export default function PromptForm({ prompt, setPrompt, format, setFormat, rowCount, setRowCount, datasetSummary, onKeyDown, actionBar }) {
+const PROVIDER_LABELS = {
+  openai: "OpenAI",
+  anthropic: "Anthropic Claude",
+  google: "Google Gemini",
+};
+
+export default function PromptForm({ prompt, setPrompt, format, setFormat, rowCount, setRowCount, provider, setProvider, availableProviders, datasetSummary, onKeyDown, actionBar }) {
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }}>
+        {availableProviders && availableProviders.length > 1 && (
+          <Select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+            size="small"
+            inputProps={{ "aria-label": "LLM provider" }}
+            sx={{ minWidth: 160, backgroundColor: "background.paper" }}
+          >
+            {availableProviders.map((p) => (
+              <MenuItem key={p} value={p}>
+                {PROVIDER_LABELS[p] || p}
+              </MenuItem>
+            ))}
+          </Select>
+        )}
         <Select
           value={format}
           onChange={(e) => setFormat(e.target.value)}
