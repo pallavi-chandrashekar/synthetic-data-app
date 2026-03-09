@@ -5,7 +5,10 @@
 
 A production-grade full-stack application that generates structured synthetic datasets from natural language prompts using **OpenAI**, **Anthropic Claude**, or **Google Gemini**. Built with **FastAPI**, **React**, and **Material UI**, featuring Bring-Your-Own-Key (BYOK) support, server-side caching, retry logic with exponential backoff, Sentry observability, rate limiting, and a comprehensive CI/CD pipeline with 90%+ test coverage.
 
-https://github.com/user-attachments/assets/3580e31e-9b7a-4b60-9081-b2c7f358df70
+
+
+https://github.com/user-attachments/assets/1f397556-2968-43be-a953-6103d54f14ba
+
 
 ---
 
@@ -38,8 +41,8 @@ https://github.com/user-attachments/assets/3580e31e-9b7a-4b60-9081-b2c7f358df70
 
 ```
                   +-----------+       +-------------------+       +-----------+
-  User  ───────>  |  React    | ────> |  FastAPI           | ────> |  OpenAI   |
-                  |  (Vite)   | <──── |  + Retry/Cache     | <──── |  Anthropic|
+  User  ───────>  |  React    | ────> |  FastAPI          | ────> |  OpenAI   |
+                  |  (Vite)   | <──── |  + Retry/Cache    | <──── |  Anthropic|
                   +-----------+       +-------------------+       |  Google   |
                         |                      |                  +-----------+
                    Sentry SDK            Sentry SDK
